@@ -1,0 +1,12 @@
+# Environment files with secrets
+.env
+
+# World data (stored in Docker volume, back up separately)
+bedrock/worlds/
+
+# Logs
+*.log
+
+# OS files
+.DS_Store
+Thumbs.db

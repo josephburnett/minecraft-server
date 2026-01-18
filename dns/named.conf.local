@@ -1,0 +1,31 @@
+// Redirect Minecraft Featured Server domains to BedrockConnect
+
+zone "hivebedrock.network" {
+    type master;
+    file "/etc/bind/db.minecraft";
+};
+
+zone "inpvp.net" {
+    type master;
+    file "/etc/bind/db.minecraft";
+};
+
+zone "lbsg.net" {
+    type master;
+    file "/etc/bind/db.minecraft";
+};
+
+zone "mineville.org" {
+    type master;
+    file "/etc/bind/db.minecraft";
+};
+
+zone "galaxite.net" {
+    type master;
+    file "/etc/bind/db.minecraft";
+};
+
+zone "pixelparadise.gg" {
+    type master;
+    file "/etc/bind/db.minecraft";
+};
