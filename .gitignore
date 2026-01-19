@@ -4,6 +4,9 @@
 # World data (stored in Docker volume, back up separately)
 bedrock/worlds/
 
+# Vanilla behavior packs (auto-generated backups from server updates)
+bedrock/behavior_packs/
+
 # Logs
 *.log
 

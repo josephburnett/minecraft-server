@@ -6,23 +6,24 @@ services:
     image: itzg/minecraft-bedrock-server
     container_name: minecraft-bedrock
     restart: unless-stopped
+    network_mode: host
     environment:
       EULA: "TRUE"
-      SERVER_NAME: "Family Server"
-      GAMEMODE: survival
+      SERVER_NAME: "Burnodd Land"
+      GAMEMODE: creative
       DIFFICULTY: normal
       ALLOW_CHEATS: "true"  # needed for /reload and /function
       MAX_PLAYERS: 10
       VIEW_DISTANCE: 16
-      LEVEL_NAME: "FamilyWorld"
+      LEVEL_NAME: "Burnodd Land"
       SERVER_PORT: 19133
-    ports:
-      - "19133:19133/udp"
+      SERVER_PORT_V6: 19134
     volumes:
       - bedrock-worlds:/data/worlds
       - ./bedrock/behavior_packs:/data/behavior_packs
     stdin_open: true
     tty: true
+    # Note: ports not needed with network_mode: host
 
   # BedrockConnect - server list for Switch
   bedrockconnect:
