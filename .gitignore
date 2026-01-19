@@ -5,7 +5,9 @@
 bedrock/worlds/
 
 # Vanilla behavior packs (auto-generated backups from server updates)
-bedrock/behavior_packs/
+bedrock/behavior_packs/*
+# Keep custom packs
+!bedrock/behavior_packs/family_functions/
 
 # Logs
 *.log
