@@ -42,14 +42,17 @@ const ABILITIES = {
         }
     },
 
-    // Emerald - creates 10x10x10 hollow stone cube
+    // Emerald - creates 10x10x10 hollow stone cube centered on player
     "minecraft:emerald": {
         name: "Cube Builder",
         permission: "operator",
         action: (player, blockHit) => {
-            const pos = blockHit.block.location;
-            player.runCommand(`fill ${pos.x} ${pos.y} ${pos.z} ${pos.x + 9} ${pos.y + 9} ${pos.z + 9} stone hollow`);
-            player.sendMessage(`§aCube created at: ${pos.x}, ${pos.y}, ${pos.z}`);
+            const pos = player.location;
+            const x = Math.floor(pos.x);
+            const y = Math.floor(pos.y);
+            const z = Math.floor(pos.z);
+            player.runCommand(`fill ${x - 5} ${y - 5} ${z - 5} ${x + 4} ${y + 4} ${z + 4} stone hollow`);
+            player.sendMessage(`§aCube created around you`);
         }
     },
 
@@ -83,7 +86,7 @@ const ABILITIES = {
         maxDistance: 100,
         action: (player, blockHit) => {
             const center = blockHit.block.location;
-            const radius = 30;
+            const radius = 20;
             const dimension = player.dimension;
             const blocksPerTick = 5000;
 
