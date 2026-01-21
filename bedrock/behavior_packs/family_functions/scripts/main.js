@@ -42,20 +42,6 @@ const ABILITIES = {
         }
     },
 
-    // Emerald - creates 10x10x10 hollow stone cube centered on player
-    "minecraft:emerald": {
-        name: "Cube Builder",
-        permission: "operator",
-        action: (player, blockHit) => {
-            const pos = player.location;
-            const x = Math.floor(pos.x);
-            const y = Math.floor(pos.y);
-            const z = Math.floor(pos.z);
-            player.runCommand(`fill ${x - 5} ${y - 5} ${z - 5} ${x + 4} ${y + 4} ${z + 4} stone hollow`);
-            player.sendMessage(`§aCube created around you`);
-        }
-    },
-
     // Snowball - spawns 100 bunnies
     "minecraft:snowball": {
         name: "Bunny Bomb",
@@ -166,6 +152,190 @@ function hasPermission(player, ability) {
 }
 
 // =============================================================================
+// STRUCTURE BUILDER
+// =============================================================================
+
+/**
+ * Base64 decode (Bedrock JS doesn't have atob)
+ */
+function base64Decode(str) {
+    const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+    let result = [];
+    let buffer = 0;
+    let bits = 0;
+
+    for (let i = 0; i < str.length; i++) {
+        const c = str[i];
+        if (c === "=") break;
+        const idx = chars.indexOf(c);
+        if (idx === -1) continue;
+
+        buffer = (buffer << 6) | idx;
+        bits += 6;
+
+        while (bits >= 8) {
+            bits -= 8;
+            result.push((buffer >> bits) & 0xff);
+        }
+    }
+
+    return result;
+}
+
+/**
+ * Decode bitfield format
+ */
+function decodeBitfield(data, size) {
+    const bytes = base64Decode(data);
+    const [width, height, length] = size;
+    const blocks = [];
+
+    let bitIndex = 0;
+    for (let x = 0; x < width; x++) {
+        for (let y = 0; y < height; y++) {
+            for (let z = 0; z < length; z++) {
+                const byteIndex = Math.floor(bitIndex / 8);
+                const bitOffset = 7 - (bitIndex % 8);
+                const bit = (bytes[byteIndex] >> bitOffset) & 1;
+
+                if (bit === 1) {
+                    blocks.push([x, y, z]);
+                }
+                bitIndex++;
+            }
+        }
+    }
+
+    return blocks;
+}
+
+/**
+ * Decode palette format
+ */
+function decodePalette(data, size, palette) {
+    const bytes = base64Decode(data);
+    const [width, height, length] = size;
+    const blocks = [];
+
+    let index = 0;
+    for (let x = 0; x < width; x++) {
+        for (let y = 0; y < height; y++) {
+            for (let z = 0; z < length; z++) {
+                const paletteIndex = bytes[index];
+                const blockType = palette[paletteIndex];
+
+                if (blockType && blockType !== "minecraft:air") {
+                    blocks.push([x, y, z, blockType]);
+                }
+                index++;
+            }
+        }
+    }
+
+    return blocks;
+}
+
+/**
+ * Build a structure at player location
+ */
+function buildStructure(player, structure) {
+    const dimension = player.dimension;
+    const playerPos = player.location;
+    const px = Math.floor(playerPos.x);
+    const py = Math.floor(playerPos.y);
+    const pz = Math.floor(playerPos.z);
+
+    const origin = structure.origin || [0, 0, 0];
+    let blocks = [];
+
+    // Decode based on structure type
+    if (structure.type === "bitfield") {
+        const positions = decodeBitfield(structure.data, structure.size);
+        const block = structure.block || "minecraft:stone";
+        blocks = positions.map(([x, y, z]) => [x, y, z, block]);
+    } else if (structure.type === "palette") {
+        blocks = decodePalette(structure.data, structure.size, structure.palette);
+    } else if (structure.type === "sparse") {
+        blocks = structure.blocks || [];
+    } else {
+        player.sendMessage(`§cUnknown structure type: ${structure.type}`);
+        return;
+    }
+
+    if (blocks.length === 0) {
+        player.sendMessage(`§cNo blocks to place!`);
+        return;
+    }
+
+    player.sendMessage(`§aBuilding structure: §f${blocks.length} blocks...`);
+
+    // Async chunked building to avoid watchdog
+    const blocksPerTick = 1000;
+    let index = 0;
+    let placed = 0;
+
+    const intervalId = system.runInterval(() => {
+        const endIndex = Math.min(index + blocksPerTick, blocks.length);
+
+        for (; index < endIndex; index++) {
+            const [sx, sy, sz, blockType] = blocks[index];
+
+            // Calculate world position
+            const wx = px + sx - origin[0];
+            const wy = py + sy - origin[1];
+            const wz = pz + sz - origin[2];
+
+            try {
+                const block = dimension.getBlock({ x: wx, y: wy, z: wz });
+                if (block) {
+                    block.setType(blockType);
+                    placed++;
+                }
+            } catch (e) {
+                // Block might be outside loaded chunks
+            }
+        }
+
+        if (index >= blocks.length) {
+            system.clearRun(intervalId);
+            player.sendMessage(`§a§lBuild complete! §r§7Placed ${placed} blocks`);
+        }
+    }, 1);
+}
+
+/**
+ * Get first online player
+ */
+function getFirstPlayer() {
+    const players = world.getAllPlayers();
+    return players.length > 0 ? players[0] : null;
+}
+
+// =============================================================================
+// SCRIPTEVENT HANDLER
+// =============================================================================
+system.afterEvents.scriptEventReceive.subscribe((event) => {
+    if (event.id === "family:build") {
+        try {
+            const json = base64Decode(event.message)
+                .map(b => String.fromCharCode(b))
+                .join("");
+            const structure = JSON.parse(json);
+            const player = getFirstPlayer();
+
+            if (!player) {
+                world.sendMessage("§cNo players online to build structure!");
+                return;
+            }
+
+            buildStructure(player, structure);
+        } catch (e) {
+            world.sendMessage(`§cFailed to parse structure: ${e.message}`);
+        }
+    }
+});
+
+// =============================================================================
 // MAIN EVENT HANDLER
 // =============================================================================
 world.afterEvents.itemUse.subscribe((event) => {
@@ -199,4 +369,5 @@ world.afterEvents.itemUse.subscribe((event) => {
 world.afterEvents.worldLoad.subscribe(() => {
     const enabled = Object.entries(ABILITIES).filter(([_, a]) => a.permission !== "disabled");
     world.sendMessage(`§aFamily scripts loaded! §7(${enabled.length} abilities active)`);
+    world.sendMessage(`§7Structure builder ready (scriptevent family:build)`);
 });
