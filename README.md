@@ -1,4 +1,4 @@
-# Family Minecraft Server
+# Burnodd Minecraft Server
 
 Bedrock Dedicated Server with BedrockConnect for Nintendo Switch access.
 
@@ -18,15 +18,15 @@ Bedrock Dedicated Server with BedrockConnect for Nintendo Switch access.
          │                     │                      │
     Switch (DNS)          Switch (via             Laptop/Steam Deck
     redirects to          BedrockConnect)         (direct connect)
-    BedrockConnect        sees "Family Server"    192.168.88.10:19133
+    BedrockConnect        sees "Burnodd Land"    192.168.88.10:19133
 ```
 
 ## How It Works
 
 1. **Switch** has its DNS pointed to rtb (192.168.88.10)
 2. When Switch tries to connect to a Featured Server (Lifeboat, Hive, etc.), DNS redirects to BedrockConnect
-3. BedrockConnect shows a server list with only "Family Server"
-4. Clicking "Family Server" connects to BDS on port 19133
+3. BedrockConnect shows a server list with only "Burnodd Land"
+4. Clicking "Burnodd Land" connects to BDS on port 19133
 5. **Laptop/Steam Deck** connect directly to 192.168.88.10:19133
 
 ## Server Setup (on rtb)
@@ -60,8 +60,8 @@ docker compose down
 ### Nintendo Switch
 1. Open Minecraft → **Play** → **Servers** tab
 2. Click any Featured Server (Lifeboat, Hive, etc.)
-3. BedrockConnect loads → shows "Family Server"
-4. Click **Family Server** → you're in!
+3. BedrockConnect loads → shows "Burnodd Land"
+4. Click **Burnodd Land** → you're in!
 
 ### Steam Deck (Bedrock Launcher)
 1. Open Minecraft → **Play** → **Servers** tab
