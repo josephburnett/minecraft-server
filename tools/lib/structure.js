@@ -108,35 +108,24 @@ function createSparseStructure(origin, blocks) {
 }
 
 /**
- * Convert a structure object to scriptevent command(s)
- * Automatically chunks large structures to fit within the 2048 char limit
+ * Convert a structure object to chunk data lines for upload
+ * Always chunks the data regardless of size for consistent handling
  * @param {object} structure - structure object
- * @returns {string[]} array of scriptevent commands
+ * @returns {string[]} array of chunk data lines (sessionId:index:total:data)
  */
-function toCommands(structure) {
+function toChunks(structure) {
     const json = JSON.stringify(structure);
     const base64 = Buffer.from(json).toString('base64');
-
-    // scriptevent has 2048 char limit, leave room for command prefix
     const maxChunkSize = 1500;
 
-    if (base64.length <= maxChunkSize) {
-        return [`scriptevent family:build ${base64}`];
-    }
-
-    // Split into chunks
     const sessionId = Math.random().toString(36).substring(2, 8);
     const chunks = [];
     for (let i = 0; i < base64.length; i += maxChunkSize) {
         chunks.push(base64.substring(i, i + maxChunkSize));
     }
 
-    const commands = [];
-    for (let i = 0; i < chunks.length; i++) {
-        commands.push(`scriptevent family:chunk ${sessionId}:${i}:${chunks.length}:${chunks[i]}`);
-    }
-
-    return commands;
+    // Return line-delimited chunk data (no scriptevent prefix)
+    return chunks.map((data, i) => `${sessionId}:${i}:${chunks.length}:${data}`);
 }
 
 /**
@@ -189,7 +178,7 @@ module.exports = {
     createBitfieldStructure,
     createPaletteStructure,
     createSparseStructure,
-    toCommands,
+    toChunks,
     createGrid,
     createNumericGrid
 };

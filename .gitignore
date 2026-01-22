@@ -7,7 +7,10 @@ bedrock/worlds/
 # Vanilla behavior packs (auto-generated backups from server updates)
 bedrock/behavior_packs/*
 # Keep custom packs
-!bedrock/behavior_packs/family_functions/
+!bedrock/behavior_packs/burnodd_scripts/
+
+# Generated structure chunks
+structure.chunks
 
 # Logs
 *.log

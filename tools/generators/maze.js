@@ -9,7 +9,7 @@
  * Outputs a scriptevent command to generate the maze
  */
 
-const { createBitfieldStructure, toCommands, createGrid } = require('../lib/structure.js');
+const { createBitfieldStructure, toChunks, createGrid } = require('../lib/structure.js');
 
 // Parse arguments
 const args = process.argv.slice(2);
@@ -149,7 +149,7 @@ const structure = createBitfieldStructure(
     grid
 );
 
-toCommands(structure).forEach(cmd => console.log(cmd));
+toChunks(structure).forEach(chunk => console.log(chunk));
 
 // Print info to stderr so it doesn't interfere with the command output
 console.error(`Generated ${mazeW}x${mazeH}x${mazeL} maze with ${block}`);

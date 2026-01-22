@@ -1,4 +1,4 @@
-.PHONY: start stop restart logs reload status
+.PHONY: start stop restart logs reload status upload
 .PHONY: maze sphere cube pyramid test
 
 # Docker commands
@@ -20,45 +20,30 @@ reload:
 status:
 	docker compose ps
 
-# Structure generators
+# Structure generators - write chunks to file
 # Usage: make maze [WIDTH=15] [HEIGHT=7] [LENGTH=15] [BLOCK=minecraft:stone_bricks]
 maze:
-	@node tools/generators/maze.js $(or $(WIDTH),15) $(or $(HEIGHT),7) $(or $(LENGTH),15) $(or $(BLOCK),minecraft:stone_bricks)
+	@node tools/generators/maze.js $(or $(WIDTH),15) $(or $(HEIGHT),7) $(or $(LENGTH),15) $(or $(BLOCK),minecraft:stone_bricks) > structure.chunks
 
 # Usage: make sphere [RADIUS=5] [BLOCK=minecraft:glass] [HOLLOW=true]
 sphere:
-	@node tools/generators/sphere.js $(or $(RADIUS),5) $(or $(BLOCK),minecraft:glass) $(or $(HOLLOW),true)
+	@node tools/generators/sphere.js $(or $(RADIUS),5) $(or $(BLOCK),minecraft:glass) $(or $(HOLLOW),true) > structure.chunks
 
 # Usage: make cube [SIZE=10] [BLOCK=minecraft:stone] [HOLLOW=true]
 cube:
-	@node tools/generators/cube.js $(or $(SIZE),10) $(or $(BLOCK),minecraft:stone) $(or $(HOLLOW),true)
+	@node tools/generators/cube.js $(or $(SIZE),10) $(or $(BLOCK),minecraft:stone) $(or $(HOLLOW),true) > structure.chunks
 
 # Usage: make pyramid [BASE=15] [BLOCK=minecraft:sandstone]
 pyramid:
-	@node tools/generators/pyramid.js $(or $(BASE),15) $(or $(BLOCK),minecraft:sandstone)
+	@node tools/generators/pyramid.js $(or $(BASE),15) $(or $(BLOCK),minecraft:sandstone) > structure.chunks
 
 # Usage: make test [PATTERN=frame] [SIZE=10]
 # Patterns: checkerboard, stripes, frame, cross, corner, small, line
 test:
-	@node tools/generators/test.js $(or $(PATTERN),frame) $(or $(SIZE),10)
+	@node tools/generators/test.js $(or $(PATTERN),frame) $(or $(SIZE),10) > structure.chunks
 
-# Generate and send to server (supports chunked transfer for large structures)
-build-maze:
-	@node tools/generators/maze.js $(or $(WIDTH),15) $(or $(HEIGHT),7) $(or $(LENGTH),15) $(or $(BLOCK),minecraft:stone_bricks) | \
-	while read cmd; do docker exec minecraft-bedrock send-command "$$cmd"; done
-
-build-sphere:
-	@node tools/generators/sphere.js $(or $(RADIUS),5) $(or $(BLOCK),minecraft:glass) $(or $(HOLLOW),true) | \
-	while read cmd; do docker exec minecraft-bedrock send-command "$$cmd"; done
-
-build-cube:
-	@node tools/generators/cube.js $(or $(SIZE),10) $(or $(BLOCK),minecraft:stone) $(or $(HOLLOW),true) | \
-	while read cmd; do docker exec minecraft-bedrock send-command "$$cmd"; done
-
-build-pyramid:
-	@node tools/generators/pyramid.js $(or $(BASE),15) $(or $(BLOCK),minecraft:sandstone) | \
-	while read cmd; do docker exec minecraft-bedrock send-command "$$cmd"; done
-
-build-test:
-	@node tools/generators/test.js $(or $(PATTERN),frame) $(or $(SIZE),10) | \
-	while read cmd; do docker exec minecraft-bedrock send-command "$$cmd"; done
+# Upload chunks from structure.chunks to server
+upload:
+	@while read chunk; do \
+		docker exec minecraft-bedrock send-command "scriptevent burnodd:chunk $$chunk"; \
+	done < structure.chunks

@@ -85,7 +85,7 @@ Function files let you create custom commands the kids can run.
 
 1. Create a `.mcfunction` file in:
    ```
-   bedrock/behavior_packs/family_functions/functions/
+   bedrock/behavior_packs/burnodd_scripts/functions/
    ```
 
 2. Example `trap.mcfunction`:
@@ -96,8 +96,8 @@ Function files let you create custom commands the kids can run.
 
 3. Restart the server OR run `/reload` in-game (requires cheats enabled)
 
-4. Run with: `/function family_functions/<filename>`
-   - Example: `/function family_functions/fireworks`
+4. Run with: `/function burnodd_scripts/<filename>`
+   - Example: `/function burnodd_scripts/fireworks`
 
 ### Included functions
 
@@ -177,7 +177,7 @@ minecraft-server/
 │   └── serverlist.json         # Server list shown to Switch
 ├── bedrock/
 │   └── behavior_packs/
-│       └── family_functions/
+│       └── burnodd_scripts/
 │           ├── manifest.json   # Pack metadata
 │           └── functions/
 │               └── fireworks.mcfunction

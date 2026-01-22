@@ -319,29 +319,9 @@ function getFirstPlayer() {
 const chunkSessions = {};
 
 system.afterEvents.scriptEventReceive.subscribe((event) => {
-    // Single-command build (small structures)
-    if (event.id === "family:build") {
-        try {
-            const json = base64Decode(event.message)
-                .map(b => String.fromCharCode(b))
-                .join("");
-            const structure = JSON.parse(json);
-            const player = getFirstPlayer();
-
-            if (!player) {
-                world.sendMessage("§cNo players online to build structure!");
-                return;
-            }
-
-            buildStructure(player, structure);
-        } catch (e) {
-            world.sendMessage(`§cFailed to parse structure: ${e.message}`);
-        }
-    }
-
-    // Chunked transfer (large structures)
-    // Format: family:chunk <sessionId>:<chunkIndex>:<totalChunks>:<data>
-    if (event.id === "family:chunk") {
+    // Chunked transfer for structure building
+    // Format: burnodd:chunk <sessionId>:<chunkIndex>:<totalChunks>:<data>
+    if (event.id === "burnodd:chunk") {
         try {
             const colonIdx1 = event.message.indexOf(":");
             const colonIdx2 = event.message.indexOf(":", colonIdx1 + 1);
@@ -423,6 +403,6 @@ world.afterEvents.itemUse.subscribe((event) => {
 // =============================================================================
 world.afterEvents.worldLoad.subscribe(() => {
     const enabled = Object.entries(ABILITIES).filter(([_, a]) => a.permission !== "disabled");
-    world.sendMessage(`§aFamily scripts loaded! §7(${enabled.length} abilities active)`);
-    world.sendMessage(`§7Structure builder ready (scriptevent family:build)`);
+    world.sendMessage(`§aBurnodd scripts loaded! §7(${enabled.length} abilities active)`);
+    world.sendMessage(`§7Structure builder ready (scriptevent burnodd:chunk)`);
 });
