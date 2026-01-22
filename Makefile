@@ -42,24 +42,23 @@ pyramid:
 test:
 	@node tools/generators/test.js $(or $(PATTERN),frame) $(or $(SIZE),10)
 
-# Generate and send to server
-# Usage: make build-maze [WIDTH=15] [HEIGHT=7] [LENGTH=15] [BLOCK=minecraft:stone_bricks]
+# Generate and send to server (supports chunked transfer for large structures)
 build-maze:
-	@CMD=$$(node tools/generators/maze.js $(or $(WIDTH),15) $(or $(HEIGHT),7) $(or $(LENGTH),15) $(or $(BLOCK),minecraft:stone_bricks)) && \
-	docker exec minecraft-bedrock send-command "$$CMD"
+	@node tools/generators/maze.js $(or $(WIDTH),15) $(or $(HEIGHT),7) $(or $(LENGTH),15) $(or $(BLOCK),minecraft:stone_bricks) | \
+	while read cmd; do docker exec minecraft-bedrock send-command "$$cmd"; done
 
 build-sphere:
-	@CMD=$$(node tools/generators/sphere.js $(or $(RADIUS),5) $(or $(BLOCK),minecraft:glass) $(or $(HOLLOW),true)) && \
-	docker exec minecraft-bedrock send-command "$$CMD"
+	@node tools/generators/sphere.js $(or $(RADIUS),5) $(or $(BLOCK),minecraft:glass) $(or $(HOLLOW),true) | \
+	while read cmd; do docker exec minecraft-bedrock send-command "$$cmd"; done
 
 build-cube:
-	@CMD=$$(node tools/generators/cube.js $(or $(SIZE),10) $(or $(BLOCK),minecraft:stone) $(or $(HOLLOW),true)) && \
-	docker exec minecraft-bedrock send-command "$$CMD"
+	@node tools/generators/cube.js $(or $(SIZE),10) $(or $(BLOCK),minecraft:stone) $(or $(HOLLOW),true) | \
+	while read cmd; do docker exec minecraft-bedrock send-command "$$cmd"; done
 
 build-pyramid:
-	@CMD=$$(node tools/generators/pyramid.js $(or $(BASE),15) $(or $(BLOCK),minecraft:sandstone)) && \
-	docker exec minecraft-bedrock send-command "$$CMD"
+	@node tools/generators/pyramid.js $(or $(BASE),15) $(or $(BLOCK),minecraft:sandstone) | \
+	while read cmd; do docker exec minecraft-bedrock send-command "$$cmd"; done
 
 build-test:
-	@CMD=$$(node tools/generators/test.js $(or $(PATTERN),frame) $(or $(SIZE),10)) && \
-	docker exec minecraft-bedrock send-command "$$CMD"
+	@node tools/generators/test.js $(or $(PATTERN),frame) $(or $(SIZE),10) | \
+	while read cmd; do docker exec minecraft-bedrock send-command "$$cmd"; done

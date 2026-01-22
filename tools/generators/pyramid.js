@@ -9,7 +9,7 @@
  * Outputs a scriptevent command to generate the pyramid
  */
 
-const { createBitfieldStructure, toCommand, createGrid } = require('../lib/structure.js');
+const { createBitfieldStructure, toCommands, createGrid } = require('../lib/structure.js');
 
 // Parse arguments
 const args = process.argv.slice(2);
@@ -50,7 +50,7 @@ const structure = createBitfieldStructure(
     grid
 );
 
-console.log(toCommand(structure));
+toCommands(structure).forEach(cmd => console.log(cmd));
 
 // Print info to stderr
 console.error(`Generated pyramid with base ${base}x${base} and height ${height}`);

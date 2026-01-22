@@ -10,7 +10,7 @@
  * Outputs a scriptevent command to generate the pattern
  */
 
-const { createSparseStructure, toCommand } = require('../lib/structure.js');
+const { createSparseStructure, toCommands } = require('../lib/structure.js');
 
 // Parse arguments
 const args = process.argv.slice(2);
@@ -134,7 +134,7 @@ switch (pattern) {
 // Create and output the structure
 const structure = createSparseStructure(origin, blocks);
 
-console.log(toCommand(structure));
+toCommands(structure).forEach(cmd => console.log(cmd));
 
 // Print info to stderr
 console.error(`Generated test pattern: ${description}`);

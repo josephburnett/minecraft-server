@@ -108,14 +108,35 @@ function createSparseStructure(origin, blocks) {
 }
 
 /**
- * Convert a structure object to a scriptevent command
+ * Convert a structure object to scriptevent command(s)
+ * Automatically chunks large structures to fit within the 2048 char limit
  * @param {object} structure - structure object
- * @returns {string} complete scriptevent command
+ * @returns {string[]} array of scriptevent commands
  */
-function toCommand(structure) {
+function toCommands(structure) {
     const json = JSON.stringify(structure);
     const base64 = Buffer.from(json).toString('base64');
-    return `scriptevent family:build ${base64}`;
+
+    // scriptevent has 2048 char limit, leave room for command prefix
+    const maxChunkSize = 1500;
+
+    if (base64.length <= maxChunkSize) {
+        return [`scriptevent family:build ${base64}`];
+    }
+
+    // Split into chunks
+    const sessionId = Math.random().toString(36).substring(2, 8);
+    const chunks = [];
+    for (let i = 0; i < base64.length; i += maxChunkSize) {
+        chunks.push(base64.substring(i, i + maxChunkSize));
+    }
+
+    const commands = [];
+    for (let i = 0; i < chunks.length; i++) {
+        commands.push(`scriptevent family:chunk ${sessionId}:${i}:${chunks.length}:${chunks[i]}`);
+    }
+
+    return commands;
 }
 
 /**
@@ -168,7 +189,7 @@ module.exports = {
     createBitfieldStructure,
     createPaletteStructure,
     createSparseStructure,
-    toCommand,
+    toCommands,
     createGrid,
     createNumericGrid
 };

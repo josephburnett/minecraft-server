@@ -314,7 +314,12 @@ function getFirstPlayer() {
 // =============================================================================
 // SCRIPTEVENT HANDLER
 // =============================================================================
+
+// Storage for chunked transfers
+const chunkSessions = {};
+
 system.afterEvents.scriptEventReceive.subscribe((event) => {
+    // Single-command build (small structures)
     if (event.id === "family:build") {
         try {
             const json = base64Decode(event.message)
@@ -331,6 +336,56 @@ system.afterEvents.scriptEventReceive.subscribe((event) => {
             buildStructure(player, structure);
         } catch (e) {
             world.sendMessage(`§cFailed to parse structure: ${e.message}`);
+        }
+    }
+
+    // Chunked transfer (large structures)
+    // Format: family:chunk <sessionId>:<chunkIndex>:<totalChunks>:<data>
+    if (event.id === "family:chunk") {
+        try {
+            const colonIdx1 = event.message.indexOf(":");
+            const colonIdx2 = event.message.indexOf(":", colonIdx1 + 1);
+            const colonIdx3 = event.message.indexOf(":", colonIdx2 + 1);
+
+            const sessionId = event.message.substring(0, colonIdx1);
+            const chunkIndex = parseInt(event.message.substring(colonIdx1 + 1, colonIdx2));
+            const totalChunks = parseInt(event.message.substring(colonIdx2 + 1, colonIdx3));
+            const data = event.message.substring(colonIdx3 + 1);
+
+            // Initialize session if needed
+            if (!chunkSessions[sessionId]) {
+                chunkSessions[sessionId] = {
+                    total: totalChunks,
+                    chunks: [],
+                    received: 0
+                };
+                world.sendMessage(`§7Receiving structure (${totalChunks} chunks)...`);
+            }
+
+            const session = chunkSessions[sessionId];
+            session.chunks[chunkIndex] = data;
+            session.received++;
+
+            // Check if all chunks received
+            if (session.received === session.total) {
+                const base64 = session.chunks.join("");
+                delete chunkSessions[sessionId];
+
+                const json = base64Decode(base64)
+                    .map(b => String.fromCharCode(b))
+                    .join("");
+                const structure = JSON.parse(json);
+                const player = getFirstPlayer();
+
+                if (!player) {
+                    world.sendMessage("§cNo players online to build structure!");
+                    return;
+                }
+
+                buildStructure(player, structure);
+            }
+        } catch (e) {
+            world.sendMessage(`§cChunk transfer failed: ${e.message}`);
         }
     }
 });
