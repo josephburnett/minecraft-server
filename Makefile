@@ -1,4 +1,4 @@
-.PHONY: start stop restart logs reload status upload play
+.PHONY: start stop restart logs reload status upload upload-local play
 .PHONY: maze sphere cube pyramid test
 
 # Docker commands
@@ -45,8 +45,15 @@ pyramid:
 test:
 	@node tools/generators/test.js $(or $(PATTERN),frame) $(or $(SIZE),10) > structure.chunks
 
-# Upload chunks from structure.chunks to server
-upload:
+# Upload chunks to Realm via gophertunnel (set REALM_INVITE or create .realm-invite)
+upload: tools/upload-realm/upload-realm
+	tools/upload-realm/upload-realm -chunks structure.chunks
+
+tools/upload-realm/upload-realm: tools/upload-realm/main.go
+	cd tools/upload-realm && go build -o upload-realm .
+
+# Upload chunks to local Docker server
+upload-local:
 	@while read chunk; do \
 		docker exec minecraft-bedrock send-command "scriptevent burnodd:chunk $$chunk"; \
 	done < structure.chunks

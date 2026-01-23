@@ -1,5 +1,10 @@
 # Environment files with secrets
 .env
+.realm-invite
+.realm-token
+
+# Node modules
+node_modules/
 
 # World data (stored in Docker volume, back up separately)
 bedrock/worlds/
