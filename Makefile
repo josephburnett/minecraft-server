@@ -1,4 +1,4 @@
-.PHONY: start stop restart logs reload status upload upload-local play
+.PHONY: start stop restart logs reload status upload upload-local play install-pack
 .PHONY: maze sphere cube pyramid test
 
 # Docker commands
@@ -49,7 +49,11 @@ test:
 upload: tools/upload-realm/upload-realm
 	tools/upload-realm/upload-realm -chunks structure.chunks
 
-tools/upload-realm/upload-realm: tools/upload-realm/main.go
+# Install behavior pack to Realm (one-time setup)
+install-pack: tools/upload-realm/upload-realm
+	tools/upload-realm/upload-realm -install-pack
+
+tools/upload-realm/upload-realm: tools/upload-realm/*.go
 	cd tools/upload-realm && go build -o upload-realm .
 
 # Upload chunks to local Docker server

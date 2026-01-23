@@ -21,23 +21,77 @@ import (
 
 const tokenFile = ".realm-token"
 const burnoddPackUUID = "a1b2c3d4-e5f6-7890-abcd-ef1234567890"
+const defaultPackPath = "bedrock/behavior_packs/burnodd_scripts"
 
 func main() {
+	// Flags for both modes
+	installPack := flag.Bool("install-pack", false, "Install behavior pack to Realm")
+	packPath := flag.String("pack-path", defaultPackPath, "Path to behavior pack folder")
+	noBackup := flag.Bool("no-backup", false, "Skip creating backup before pack installation")
+
+	// Flags for chunk uploader mode
 	chunksFile := flag.String("chunks", "structure.chunks", "Path to chunks file")
+
 	flag.Parse()
 
+	if *installPack {
+		if err := runPackInstaller(*packPath, *noBackup); err != nil {
+			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+			os.Exit(1)
+		}
+	} else {
+		if err := runChunkUploader(*chunksFile); err != nil {
+			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+			os.Exit(1)
+		}
+	}
+}
+
+func runPackInstaller(packPath string, noBackup bool) error {
 	// Get realm invite code
 	inviteCode, err := getRealmInvite()
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
-		os.Exit(1)
+		return err
+	}
+
+	// Authenticate
+	tokenSource, err := getTokenSource()
+	if err != nil {
+		return fmt.Errorf("auth error: %w", err)
+	}
+
+	ctx := context.Background()
+
+	// Get Realm info
+	realmsClient := realms.NewClient(tokenSource, nil)
+	fmt.Println("Looking up Realm...")
+	realm, err := realmsClient.Realm(ctx, inviteCode)
+	if err != nil {
+		return fmt.Errorf("realm lookup error: %w", err)
+	}
+
+	fmt.Printf("Found Realm: %s (ID: %d)\n", realm.Name, realm.ID)
+
+	// Create HTTP client and installer
+	httpClient := NewRealmsHTTPClient(tokenSource)
+	installer := NewPackInstaller(httpClient, noBackup)
+
+	// Install the pack
+	// Version will be read from the pack's manifest.json
+	return installer.Install(ctx, realm, packPath, "", [3]int{})
+}
+
+func runChunkUploader(chunksFile string) error {
+	// Get realm invite code
+	inviteCode, err := getRealmInvite()
+	if err != nil {
+		return err
 	}
 
 	// Read chunks
-	chunks, err := readChunks(*chunksFile)
+	chunks, err := readChunks(chunksFile)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
-		os.Exit(1)
+		return err
 	}
 
 	fmt.Printf("Uploading %d chunks to Realm...\n", len(chunks))
@@ -45,8 +99,7 @@ func main() {
 	// Authenticate (with token caching)
 	tokenSource, err := getTokenSource()
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "Auth error: %v\n", err)
-		os.Exit(1)
+		return fmt.Errorf("auth error: %w", err)
 	}
 
 	// Get Realm address
@@ -56,14 +109,12 @@ func main() {
 	fmt.Println("Looking up Realm...")
 	realm, err := realmsClient.Realm(ctx, inviteCode)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "Realm lookup error: %v\n", err)
-		os.Exit(1)
+		return fmt.Errorf("realm lookup error: %w", err)
 	}
 
 	address, err := realm.Address(ctx)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "Realm address error: %v\n", err)
-		os.Exit(1)
+		return fmt.Errorf("realm address error: %w", err)
 	}
 
 	fmt.Printf("Connecting to %s (%s)...\n", realm.Name, address)
@@ -75,15 +126,13 @@ func main() {
 
 	conn, err := dialer.Dial("raknet", address)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "Connection error: %v\n", err)
-		os.Exit(1)
+		return fmt.Errorf("connection error: %w", err)
 	}
 	defer conn.Close()
 
 	// Spawn
 	if err := conn.DoSpawn(); err != nil {
-		fmt.Fprintf(os.Stderr, "Spawn error: %v\n", err)
-		os.Exit(1)
+		return fmt.Errorf("spawn error: %w", err)
 	}
 
 	// Check for burnodd_scripts pack
@@ -96,9 +145,7 @@ func main() {
 		}
 	}
 	if !packFound {
-		fmt.Fprintf(os.Stderr, "Error: burnodd_scripts behavior pack not found on Realm!\n")
-		fmt.Fprintf(os.Stderr, "Please add the pack to your Realm first.\n")
-		os.Exit(1)
+		return fmt.Errorf("burnodd_scripts behavior pack not found on Realm!\nPlease run 'make install-pack' first.")
 	}
 
 	fmt.Println("Connected! Sending commands...")
@@ -114,8 +161,7 @@ func main() {
 			},
 		})
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "Command error: %v\n", err)
-			break
+			return fmt.Errorf("command error: %w", err)
 		}
 
 		if (i+1)%50 == 0 {
@@ -127,6 +173,7 @@ func main() {
 
 	fmt.Printf("Done! Sent %d commands.\n", len(chunks))
 	time.Sleep(time.Second)
+	return nil
 }
 
 func getTokenSource() (oauth2.TokenSource, error) {

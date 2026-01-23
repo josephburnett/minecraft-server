@@ -17,6 +17,13 @@ bedrock/behavior_packs/*
 # Generated structure chunks
 structure.chunks
 
+# Compiled binaries
+tools/upload-realm/upload-realm
+
+# Realm world backups and output
+backups/
+output/
+
 # Logs
 *.log
 

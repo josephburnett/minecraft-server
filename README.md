@@ -1,85 +1,61 @@
 # Burnodd Minecraft Server
 
-Bedrock Dedicated Server with BedrockConnect for Nintendo Switch access.
+Tools for managing a Minecraft Bedrock Realm with custom behavior packs and structure generation.
 
 ## Architecture
 
-```
-┌──────────────────────────────────────────────────────────────────┐
-│                        rtb (192.168.88.10)                       │
-│                                                                  │
-│  ┌──────────────┐  ┌───────────────────┐  ┌───────────────────┐  │
-│  │     DNS      │  │   BedrockConnect  │  │       BDS         │  │
-│  │   (BIND9)    │  │   (server list)   │  │  (game server)    │  │
-│  │    :53       │  │    :19132/udp     │  │   :19133/udp      │  │
-│  └──────────────┘  └───────────────────┘  └───────────────────┘  │
-└──────────────────────────────────────────────────────────────────┘
-         │                     │                      │
-         │                     │                      │
-    Switch (DNS)          Switch (via             Laptop/Steam Deck
-    redirects to          BedrockConnect)         (direct connect)
-    BedrockConnect        sees "Burnodd Land"    192.168.88.10:19133
-```
+- **Behavior Pack**: Scripts that receive structure commands via scriptevent
+- **Upload Tool**: Connects as player to send commands via gophertunnel
+- **Generators**: Create 3D structure data (maze, sphere, cube, pyramid)
 
-## How It Works
+## Why This Works
 
-1. **Switch** has its DNS pointed to rtb (192.168.88.10)
-2. When Switch tries to connect to a Featured Server (Lifeboat, Hive, etc.), DNS redirects to BedrockConnect
-3. BedrockConnect shows a server list with only "Burnodd Land"
-4. Clicking "Burnodd Land" connects to BDS on port 19133
-5. **Laptop/Steam Deck** connect directly to 192.168.88.10:19133
+The Realm upload tool authenticates with Xbox Live, then connects as a player via gophertunnel. The behavior pack's JavaScript API listens for scriptevent messages and builds structures block-by-block.
 
-## Server Setup (on rtb)
+## Realm Setup
+
+1. Create `.realm-invite` with your invite code
+2. Run `make install-pack` to prepare the world with the behavior pack
+3. Upload the generated `.mcworld` file to your Realm via Minecraft
+4. Run `make upload` to send structures
+
+## Quick Start
 
 ```bash
-# Clone the repo
-git clone <repo-url> ~/minecraft-server
-cd ~/minecraft-server
+# One-time: Prepare the behavior pack for your Realm
+make install-pack
+# This downloads your Realm world, injects the pack, and saves to output/realm-with-pack.mcworld
+# Then manually upload via Minecraft: Realm Settings > Replace World
 
-# Start everything
-docker compose up -d
+# Generate a structure
+make sphere RADIUS=10 BLOCK=minecraft:glass
 
-# Check logs
-docker compose logs -f
-
-# Stop everything
-docker compose down
+# Upload to Realm
+make upload
 ```
 
-## Switch Setup (one-time per Switch)
+## Structure Generators
 
-1. **Settings** → **Internet** → **Internet Settings**
-2. Select your WiFi network → **Change Settings**
-3. **DNS Settings** → **Manual**
-4. **Primary DNS**: `192.168.88.10`
-5. **Secondary DNS**: `8.8.8.8`
-6. **Save**
+```bash
+# Maze: WIDTH, HEIGHT, LENGTH, BLOCK
+make maze WIDTH=15 HEIGHT=7 LENGTH=15 BLOCK=minecraft:stone_bricks
 
-## Connecting
+# Sphere: RADIUS, BLOCK, HOLLOW
+make sphere RADIUS=5 BLOCK=minecraft:glass HOLLOW=true
 
-### Nintendo Switch
-1. Open Minecraft → **Play** → **Servers** tab
-2. Click any Featured Server (Lifeboat, Hive, etc.)
-3. BedrockConnect loads → shows "Burnodd Land"
-4. Click **Burnodd Land** → you're in!
+# Cube: SIZE, BLOCK, HOLLOW
+make cube SIZE=10 BLOCK=minecraft:stone HOLLOW=true
 
-### Steam Deck (Bedrock Launcher)
-1. Open Minecraft → **Play** → **Servers** tab
-2. Click **Add Server**
-3. Server Address: `192.168.88.10`
-4. Port: `19133`
-5. Save and connect
+# Pyramid: BASE, BLOCK
+make pyramid BASE=15 BLOCK=minecraft:sandstone
 
-### Windows/Laptop (Bedrock Edition)
-1. Open Minecraft → **Play** → **Servers** tab
-2. Scroll down → **Add Server**
-3. Server Address: `192.168.88.10`
-4. Port: `19133`
-5. Save and connect
+# Test patterns: PATTERN, SIZE
+make test PATTERN=frame SIZE=10
+```
 
 ## Custom Functions
 
-Function files let you create custom commands the kids can run.
+Function files let you create custom commands.
 
 ### Creating a function
 
@@ -94,96 +70,61 @@ Function files let you create custom commands the kids can run.
    fill ~-2 ~ ~-2 ~2 ~3 ~2 glass hollow
    ```
 
-3. Restart the server OR run `/reload` in-game (requires cheats enabled)
+3. Re-run `make install-pack` to update the Realm
 
 4. Run with: `/function burnodd_scripts/<filename>`
-   - Example: `/function burnodd_scripts/fireworks`
 
 ### Included functions
 
 - `fireworks` - Launches fireworks around the player
+- `cube` - Creates a hollow glass cube
 
-## Server Console
+## Connecting
 
-To run server commands or see live output:
+### Nintendo Switch
+1. Open Minecraft and accept the Realm invite
+2. Join from the Realms tab
 
-```bash
-# Attach to console
-docker attach minecraft-bedrock
-
-# Detach without stopping: Ctrl+P, Ctrl+Q
-```
-
-Useful commands:
-- `/reload` - Reload function files
-- `/list` - Show connected players
-- `/say <message>` - Broadcast message
-- `/op <player>` - Give operator permissions
+### Windows/Steam Deck
+1. Open Minecraft and accept the Realm invite
+2. Join from the Realms tab
 
 ## Backups
 
-World data is stored in a Docker volume (`bedrock-worlds`).
+World backups are automatically created before pack injection in `backups/`.
+The modified world is saved to `output/realm-with-pack.mcworld`.
 
-### Manual backup
+To skip backups:
 ```bash
-# Find volume location
-docker volume inspect minecraft-server_bedrock-worlds
-
-# Or copy from container
-docker cp minecraft-bedrock:/data/worlds ./backup-$(date +%Y%m%d)
-```
-
-### Restore
-```bash
-docker cp ./backup-folder/. minecraft-bedrock:/data/worlds/
-docker restart minecraft-bedrock
+tools/upload-realm/upload-realm -install-pack -no-backup
 ```
 
 ## Troubleshooting
 
-### Switch connects to real Featured Server instead of BedrockConnect
-- Verify DNS settings on Switch (Primary: 192.168.88.10)
-- Check DNS container is running: `docker compose ps`
-- Try a different Featured Server (Lifeboat works well)
+### "behavior pack not found on Realm"
+Run `make install-pack` to install the behavior pack to your Realm.
 
-### "Unable to connect to world"
-- Check BDS is running: `docker compose logs bedrock`
-- Verify port 19133/udp is accessible
-- Check firewall on rtb
+### Authentication issues
+Delete `.realm-token` and re-run to authenticate again.
 
 ### Functions not working
 - Verify behavior pack structure (manifest.json must be valid)
-- Run `/reload` after adding new functions
-- Check BDS logs for errors loading packs
-
-### BedrockConnect shows empty list
-- Check `bedrockconnect/serverlist.json` has correct IP
-- Restart bedrockconnect: `docker compose restart bedrockconnect`
-
-## Ports Used
-
-| Service        | Port      | Protocol |
-|----------------|-----------|----------|
-| DNS            | 53        | UDP/TCP  |
-| BedrockConnect | 19132     | UDP      |
-| BDS (game)     | 19133     | UDP      |
+- Re-run `make install-pack` after adding new functions
 
 ## Files
 
 ```
 minecraft-server/
-├── docker-compose.yml          # Container definitions
-├── bedrockconnect/
-│   └── serverlist.json         # Server list shown to Switch
+├── Makefile                    # Build and upload commands
+├── .realm-invite               # Your Realm invite code (create this)
 ├── bedrock/
 │   └── behavior_packs/
 │       └── burnodd_scripts/
 │           ├── manifest.json   # Pack metadata
-│           └── functions/
-│               └── fireworks.mcfunction
-├── dns/
-│   ├── named.conf.options      # BIND9 options
-│   ├── named.conf.local        # Zone definitions
-│   └── db.minecraft            # DNS records (points to rtb)
-└── README.md
+│           ├── scripts/main.js # Scriptevent handler
+│           └── functions/      # Custom mcfunctions
+├── tools/
+│   ├── generators/             # Structure generators (JS)
+│   └── upload-realm/           # Realm upload tool (Go)
+└── backups/                    # World backups (auto-created)
 ```
