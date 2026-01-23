@@ -4,7 +4,9 @@ services:
     image: itzg/minecraft-bedrock-server
     container_name: minecraft-bedrock
     restart: unless-stopped
-    network_mode: host
+    ports:
+      - "127.0.0.1:19133:19133/udp"
+      - "127.0.0.1:19134:19134/udp"
     environment:
       EULA: "TRUE"
       SERVER_NAME: "Burnodd Land"
@@ -17,13 +19,11 @@ services:
       LEVEL_NAME: "Burnodd Land"
       SERVER_PORT: 19133
       SERVER_PORT_V6: 19134
-      SERVER_BIND_ADDRESS: "127.0.0.1"
     volumes:
       - bedrock-worlds:/data/worlds
       - ./bedrock/behavior_packs:/data/behavior_packs
     stdin_open: true
     tty: true
-    # Note: ports not needed with network_mode: host
 
 volumes:
   bedrock-worlds:

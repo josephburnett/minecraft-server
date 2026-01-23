@@ -21,7 +21,7 @@ status:
 	docker compose ps
 
 play:
-	cmd.exe /c start 'minecraft://?addExternalServer=Burnodd%%20Land|localhost:19133'
+	powershell.exe -Command "Start-Process 'minecraft://connect/?serverUrl=127.0.0.1&serverPort=19133'"
 
 # Structure generators - write chunks to file
 # Usage: make maze [WIDTH=15] [HEIGHT=7] [LENGTH=15] [BLOCK=minecraft:stone_bricks]
