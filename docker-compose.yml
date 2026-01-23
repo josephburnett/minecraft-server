@@ -1,5 +1,3 @@
-version: "3.8"
-
 services:
   # Minecraft Bedrock Dedicated Server
   bedrock:
@@ -19,44 +17,13 @@ services:
       LEVEL_NAME: "Burnodd Land"
       SERVER_PORT: 19133
       SERVER_PORT_V6: 19134
+      SERVER_BIND_ADDRESS: "127.0.0.1"
     volumes:
       - bedrock-worlds:/data/worlds
       - ./bedrock/behavior_packs:/data/behavior_packs
     stdin_open: true
     tty: true
     # Note: ports not needed with network_mode: host
-
-  # BedrockConnect - server list for Switch
-  bedrockconnect:
-    image: strausmann/minecraft-bedrock-connect:2
-    container_name: bedrockconnect
-    restart: unless-stopped
-    environment:
-      NODB: "true"
-      CUSTOM_SERVERS: /config/serverlist.json
-      FEATURED_SERVERS: "false"
-      USER_SERVERS: "false"
-      KICK_INACTIVE: "true"
-    ports:
-      - "19132:19132/udp"
-    volumes:
-      - ./bedrockconnect:/config:ro
-
-  # DNS server to redirect Switch connections
-  dns:
-    image: ubuntu/bind9:latest
-    container_name: minecraft-dns
-    restart: unless-stopped
-    ports:
-      - "53:53/udp"
-      - "53:53/tcp"
-    volumes:
-      - ./dns:/etc/bind/custom:ro
-    command: >
-      bash -c "cat /etc/bind/custom/named.conf.options > /etc/bind/named.conf.options &&
-               cat /etc/bind/custom/named.conf.local > /etc/bind/named.conf.local &&
-               cp /etc/bind/custom/db.minecraft /etc/bind/db.minecraft &&
-               named -g"
 
 volumes:
   bedrock-worlds:

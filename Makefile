@@ -1,4 +1,4 @@
-.PHONY: start stop restart logs reload status upload
+.PHONY: start stop restart logs reload status upload play
 .PHONY: maze sphere cube pyramid test
 
 # Docker commands
@@ -19,6 +19,9 @@ reload:
 
 status:
 	docker compose ps
+
+play:
+	cmd.exe /c start 'minecraft://?addExternalServer=Burnodd%%20Land|localhost:19133'
 
 # Structure generators - write chunks to file
 # Usage: make maze [WIDTH=15] [HEIGHT=7] [LENGTH=15] [BLOCK=minecraft:stone_bricks]
