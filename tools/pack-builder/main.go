@@ -4,6 +4,7 @@ package main
 
 import (
 	"archive/zip"
+	"crypto/rand"
 	"encoding/json"
 	"flag"
 	"fmt"
@@ -84,6 +85,19 @@ func main() {
 	fmt.Printf("Created %s\n", outputPath)
 }
 
+// generateUUID generates a random UUID v4
+func generateUUID() string {
+	uuid := make([]byte, 16)
+	rand.Read(uuid)
+
+	// Set version (4) and variant (2) bits
+	uuid[6] = (uuid[6] & 0x0f) | 0x40
+	uuid[8] = (uuid[8] & 0x3f) | 0x80
+
+	return fmt.Sprintf("%08x-%04x-%04x-%04x-%012x",
+		uuid[0:4], uuid[4:6], uuid[6:8], uuid[8:10], uuid[10:16])
+}
+
 func getVersion(packDir string) ([3]int, error) {
 	manifestPath := filepath.Join(packDir, "manifest.json")
 	data, err := os.ReadFile(manifestPath)
@@ -120,9 +134,14 @@ func bumpVersion(packDir string) ([3]int, error) {
 	versionStr := fmt.Sprintf("%d.%d.%d", manifest.Header.Version[0], manifest.Header.Version[1], manifest.Header.Version[2])
 	manifest.Header.Description = fmt.Sprintf("Burnodd Scripts v%s", versionStr)
 
-	// Also bump module versions to match
+	// Generate new UUIDs
+	manifest.Header.UUID = generateUUID()
+	fmt.Printf("Header UUID: %s\n", manifest.Header.UUID)
+
 	for i := range manifest.Modules {
 		manifest.Modules[i].Version = manifest.Header.Version
+		manifest.Modules[i].UUID = generateUUID()
+		fmt.Printf("Module %d UUID: %s\n", i, manifest.Modules[i].UUID)
 	}
 
 	// Write back
