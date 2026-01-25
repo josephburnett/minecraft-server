@@ -44,25 +44,59 @@ type Dependency struct {
 
 func main() {
 	packDir := flag.String("pack", "bedrock/behavior_packs/burnodd_scripts", "Path to behavior pack directory")
-	output := flag.String("output", "output/burnodd_scripts.mcpack", "Output .mcpack file path")
+	outputDir := flag.String("output-dir", "output", "Output directory for .mcpack file")
 	noBump := flag.Bool("no-bump", false, "Skip version bump")
 	flag.Parse()
 
+	// Bump version and get the new version
+	var version [3]int
+	var err error
 	if !*noBump {
-		newVersion, err := bumpVersion(*packDir)
+		version, err = bumpVersion(*packDir)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "Error bumping version: %v\n", err)
 			os.Exit(1)
 		}
-		fmt.Printf("Version: %d.%d.%d\n", newVersion[0], newVersion[1], newVersion[2])
+	} else {
+		version, err = getVersion(*packDir)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Error reading version: %v\n", err)
+			os.Exit(1)
+		}
 	}
 
-	if err := createMcpack(*packDir, *output); err != nil {
+	versionStr := fmt.Sprintf("%d.%d.%d", version[0], version[1], version[2])
+	fmt.Printf("Version: %s\n", versionStr)
+
+	// Delete old .mcpack files
+	if err := deleteOldPacks(*outputDir); err != nil {
+		fmt.Fprintf(os.Stderr, "Error cleaning old packs: %v\n", err)
+		os.Exit(1)
+	}
+
+	// Create new pack with version in filename
+	outputPath := filepath.Join(*outputDir, fmt.Sprintf("Burnodd-%s.mcpack", versionStr))
+	if err := createMcpack(*packDir, outputPath); err != nil {
 		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 		os.Exit(1)
 	}
 
-	fmt.Printf("Created %s\n", *output)
+	fmt.Printf("Created %s\n", outputPath)
+}
+
+func getVersion(packDir string) ([3]int, error) {
+	manifestPath := filepath.Join(packDir, "manifest.json")
+	data, err := os.ReadFile(manifestPath)
+	if err != nil {
+		return [3]int{}, fmt.Errorf("reading manifest: %w", err)
+	}
+
+	var manifest Manifest
+	if err := json.Unmarshal(data, &manifest); err != nil {
+		return [3]int{}, fmt.Errorf("parsing manifest: %w", err)
+	}
+
+	return manifest.Header.Version, nil
 }
 
 func bumpVersion(packDir string) ([3]int, error) {
@@ -82,6 +116,10 @@ func bumpVersion(packDir string) ([3]int, error) {
 	// Bump patch version
 	manifest.Header.Version[2]++
 
+	// Update description to include version
+	versionStr := fmt.Sprintf("%d.%d.%d", manifest.Header.Version[0], manifest.Header.Version[1], manifest.Header.Version[2])
+	manifest.Header.Description = fmt.Sprintf("Burnodd Scripts v%s", versionStr)
+
 	// Also bump module versions to match
 	for i := range manifest.Modules {
 		manifest.Modules[i].Version = manifest.Header.Version
@@ -98,6 +136,31 @@ func bumpVersion(packDir string) ([3]int, error) {
 	}
 
 	return manifest.Header.Version, nil
+}
+
+func deleteOldPacks(outputDir string) error {
+	// Ensure output directory exists
+	if err := os.MkdirAll(outputDir, 0755); err != nil {
+		return fmt.Errorf("creating output directory: %w", err)
+	}
+
+	// Find and delete old .mcpack files
+	entries, err := os.ReadDir(outputDir)
+	if err != nil {
+		return fmt.Errorf("reading output directory: %w", err)
+	}
+
+	for _, entry := range entries {
+		if !entry.IsDir() && strings.HasSuffix(entry.Name(), ".mcpack") {
+			path := filepath.Join(outputDir, entry.Name())
+			fmt.Printf("Removing old pack: %s\n", entry.Name())
+			if err := os.Remove(path); err != nil {
+				return fmt.Errorf("removing %s: %w", path, err)
+			}
+		}
+	}
+
+	return nil
 }
 
 func createMcpack(packDir, outputPath string) error {

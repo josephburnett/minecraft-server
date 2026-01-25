@@ -2,12 +2,12 @@
   "format_version": 2,
   "header": {
     "name": "Burnodd Scripts",
-    "description": "Burnodd's custom commands and scripts",
+    "description": "Burnodd Scripts v1.1.2",
     "uuid": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
     "version": [
       1,
       1,
-      1
+      2
     ],
     "min_engine_version": [
       1,
@@ -22,7 +22,7 @@
       "version": [
         1,
         1,
-        1
+        2
       ]
     },
     {
@@ -31,7 +31,7 @@
       "version": [
         1,
         1,
-        1
+        2
       ],
       "language": "javascript",
       "entry": "scripts/main.js"
