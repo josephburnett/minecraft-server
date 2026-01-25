@@ -19,10 +19,14 @@ structure.chunks
 
 # Compiled binaries
 tools/upload-realm/upload-realm
+tools/pack-builder/pack-builder
 
-# Realm world backups and output
+# Realm world backups
 backups/
-output/
+
+# Output folder contents (but keep .mcpack for download)
+output/*
+!output/*.mcpack
 
 # Logs
 *.log

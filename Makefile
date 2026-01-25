@@ -1,4 +1,4 @@
-.PHONY: start stop restart logs reload status upload upload-local play install-pack
+.PHONY: start stop restart logs reload status upload upload-local play install-pack pack
 .PHONY: maze sphere cube pyramid test
 
 # Docker commands
@@ -61,3 +61,11 @@ upload-local:
 	@while read chunk; do \
 		docker exec minecraft-bedrock send-command "scriptevent burnodd:chunk $$chunk"; \
 	done < structure.chunks
+
+# Build .mcpack file for import into Minecraft
+# Output: output/burnodd_scripts.mcpack (double-click to import)
+pack: tools/pack-builder/pack-builder
+	tools/pack-builder/pack-builder
+
+tools/pack-builder/pack-builder: tools/pack-builder/*.go
+	cd tools/pack-builder && go build -o pack-builder .
