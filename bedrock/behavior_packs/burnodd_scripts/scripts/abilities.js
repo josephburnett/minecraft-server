@@ -58,16 +58,16 @@ export const ABILITIES = {
         }
     },
 
-    // Snowball - spawns 100 bunnies
+    // Snowball - spawns 10 bunnies
     "minecraft:snowball": {
         name: "Bunny Bomb",
         permission: "operator",
         action: (player, blockHit) => {
             const pos = blockHit.block.location;
-            for (let i = 0; i < 100; i++) {
+            for (let i = 0; i < 10; i++) {
                 player.runCommand(`summon rabbit ${pos.x} ${pos.y + 1} ${pos.z}`);
             }
-            player.sendMessage(`§d§l100 BUNNIES! §r§7at ${pos.x}, ${pos.y}, ${pos.z}`);
+            player.sendMessage(`§d§l10 BUNNIES! §r§7at ${pos.x}, ${pos.y}, ${pos.z}`);
         }
     },
 
