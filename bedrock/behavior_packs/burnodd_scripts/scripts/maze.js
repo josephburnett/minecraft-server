@@ -1,28 +1,7 @@
 import { world, system } from "@minecraft/server";
 import { buildBlocksAt } from "./structure-builder.js";
-import { getMarker, clearMarker } from "./marker.js";
-
-/**
- * Create a 3D boolean grid initialized to a value
- * @param {number} width
- * @param {number} height
- * @param {number} length
- * @param {boolean} value - initial value
- * @returns {boolean[][][]}
- */
-export function createGrid(width, height, length, value = false) {
-    const grid = [];
-    for (let x = 0; x < width; x++) {
-        grid[x] = [];
-        for (let y = 0; y < height; y++) {
-            grid[x][y] = [];
-            for (let z = 0; z < length; z++) {
-                grid[x][y][z] = value;
-            }
-        }
-    }
-    return grid;
-}
+import { consumeMarker } from "./marker.js";
+import { createGrid, gridToBlocks, getPlayerRotation } from "./shapes.js";
 
 /**
  * Shuffle array in place (Fisher-Yates)
@@ -158,55 +137,6 @@ export function generateMazeGrid(width, height, length) {
 }
 
 /**
- * Convert maze grid to block array
- * @param {boolean[][][]} grid - 3D boolean grid (true = block)
- * @param {string} blockType - Block type ID
- * @returns {Array<[number, number, number, string]>}
- */
-export function gridToBlocks(grid, blockType) {
-    const blocks = [];
-    const width = grid.length;
-    const height = grid[0]?.length || 0;
-    const length = grid[0]?.[0]?.length || 0;
-
-    for (let x = 0; x < width; x++) {
-        for (let y = 0; y < height; y++) {
-            for (let z = 0; z < length; z++) {
-                if (grid[x][y][z]) {
-                    blocks.push([x, y, z, blockType]);
-                }
-            }
-        }
-    }
-
-    return blocks;
-}
-
-/**
- * Get player's horizontal facing direction
- * @param {Player} player
- * @returns {{dx: number, dz: number, rotation: number}} Unit direction and rotation (0=S, 90=W, 180=N, 270=E)
- */
-export function getPlayerFacing(player) {
-    const rotation = player.getRotation();
-    const yaw = rotation.y; // -180 to 180, 0 = south (+Z)
-
-    // Normalize to 0-360
-    const normalizedYaw = ((yaw % 360) + 360) % 360;
-
-    // Determine cardinal direction
-    if (normalizedYaw >= 315 || normalizedYaw < 45) {
-        return { dx: 0, dz: 1, rotation: 0 };     // South (+Z)
-    } else if (normalizedYaw >= 45 && normalizedYaw < 135) {
-        return { dx: -1, dz: 0, rotation: 90 };   // West (-X)
-    } else if (normalizedYaw >= 135 && normalizedYaw < 225) {
-        return { dx: 0, dz: -1, rotation: 180 };  // North (-Z)
-    } else {
-        return { dx: 1, dz: 0, rotation: 270 };   // East (+X)
-    }
-}
-
-/**
  * Rotate blocks around the Y axis
  * @param {Array<[number, number, number, string]>} blocks
  * @param {number[]} size - [width, height, length]
@@ -242,20 +172,6 @@ export function rotateBlocks(blocks, size, rotation) {
 }
 
 /**
- * Get rotated size after rotation
- * @param {number[]} size - [width, height, length]
- * @param {number} rotation - 0, 90, 180, or 270 degrees
- * @returns {number[]} - [newWidth, height, newLength]
- */
-export function getRotatedSize(size, rotation) {
-    const [w, h, l] = size;
-    if (rotation === 90 || rotation === 270) {
-        return [l, h, w];
-    }
-    return [w, h, l];
-}
-
-/**
  * Build a maze at the marker location (if set) or player's location
  * @param {Player} player
  * @param {object} options
@@ -270,8 +186,8 @@ export function buildMaze(player, options = {}) {
     const length = options.length || 15;
     const blockType = options.block || "minecraft:stone_bricks";
 
-    // Check for stored marker
-    const marker = getMarker();
+    // Try to consume marker FIRST (removes blocks before building)
+    const marker = consumeMarker();
     let buildX, buildY, buildZ, rotation, dimension;
 
     if (marker) {
@@ -281,15 +197,13 @@ export function buildMaze(player, options = {}) {
         rotation = marker.rotation;
         dimension = marker.dimension;
         player.sendMessage(`§aBuilding ${width}x${height}x${length} maze at marker...`);
-        // Clear the marker after use
-        clearMarker();
     } else {
         // Fall back to player position and facing
         const pos = player.location;
         buildX = Math.floor(pos.x);
         buildY = Math.floor(pos.y);
         buildZ = Math.floor(pos.z);
-        rotation = getPlayerFacing(player).rotation;
+        rotation = getPlayerRotation(player);
         dimension = player.dimension;
         player.sendMessage(`§aGenerating ${width}x${height}x${length} maze at player...`);
     }
@@ -302,14 +216,11 @@ export function buildMaze(player, options = {}) {
 
     // Rotate maze based on marker/player rotation
     blocks = rotateBlocks(blocks, size, rotation);
-    const rotatedSize = getRotatedSize(size, rotation);
-    const [rw, rh, rl] = rotatedSize;
 
     const totalBlocks = blocks.length;
     player.sendMessage(`§7Placing ${totalBlocks} blocks...`);
 
     // Build at the target location
-    // Origin is [0, 0, 0] - maze builds with corner at marker/player position
     buildBlocksAt(dimension, buildX, buildY, buildZ, blocks, (placed) => {
         player.sendMessage(`§a§lMaze complete! §r§7${placed} blocks placed`);
         player.sendMessage(`§7Tip: Exit is at the opposite corner`);

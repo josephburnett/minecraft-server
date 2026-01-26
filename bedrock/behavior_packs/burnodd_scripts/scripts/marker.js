@@ -12,10 +12,32 @@ export function getMarker() {
 }
 
 /**
- * Clear the current marker
+ * Clear the current marker (state only, not blocks)
  */
 export function clearMarker() {
     currentMarker = null;
+}
+
+/**
+ * Consume the marker - removes blocks, clears state, returns position info
+ * Call this BEFORE building to ensure marker is fully removed
+ * @returns {{x: number, y: number, z: number, rotation: number, dimension: Dimension}|null}
+ */
+export function consumeMarker() {
+    if (!currentMarker) {
+        return null;
+    }
+
+    const marker = currentMarker;
+    const { x, y, z, dimension } = marker;
+
+    // Remove marker blocks FIRST
+    removeMarkerBlocks(dimension, x, y, z);
+
+    // Clear state
+    currentMarker = null;
+
+    return marker;
 }
 
 /**
