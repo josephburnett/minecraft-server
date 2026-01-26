@@ -211,3 +211,49 @@ export function buildBlocks(player, blocks, origin = [0, 0, 0], onComplete = nul
         }
     }, 1);
 }
+
+/**
+ * Build blocks at a specific world location
+ * @param {Dimension} dimension
+ * @param {number} baseX - Base X coordinate
+ * @param {number} baseY - Base Y coordinate
+ * @param {number} baseZ - Base Z coordinate
+ * @param {Array<[number, number, number, string]>} blocks - Array of [x, y, z, blockType]
+ * @param {function} [onComplete] - Optional callback when build completes
+ */
+export function buildBlocksAt(dimension, baseX, baseY, baseZ, blocks, onComplete = null) {
+    if (blocks.length === 0) {
+        return;
+    }
+
+    const blocksPerTick = 1000;
+    let index = 0;
+    let placed = 0;
+
+    const intervalId = system.runInterval(() => {
+        const endIndex = Math.min(index + blocksPerTick, blocks.length);
+
+        for (; index < endIndex; index++) {
+            const [sx, sy, sz, blockType] = blocks[index];
+
+            const wx = baseX + sx;
+            const wy = baseY + sy;
+            const wz = baseZ + sz;
+
+            try {
+                const block = dimension.getBlock({ x: wx, y: wy, z: wz });
+                if (block) {
+                    block.setType(blockType);
+                    placed++;
+                }
+            } catch (e) {
+                // Block might be outside loaded chunks
+            }
+        }
+
+        if (index >= blocks.length) {
+            system.clearRun(intervalId);
+            if (onComplete) onComplete(placed);
+        }
+    }, 1);
+}
