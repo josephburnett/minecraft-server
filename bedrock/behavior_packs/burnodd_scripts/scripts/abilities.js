@@ -1,5 +1,3 @@
-import { system } from "@minecraft/server";
-
 /**
  * Ability configuration
  * Permission levels: "disabled" | "operator" | "everyone"
@@ -19,15 +17,33 @@ export const ABILITIES = {
         }
     },
 
-    // Blaze Rod - destroys single block
+    // Blaze Rod - small dig (radius 2 sphere, single tick)
     "minecraft:blaze_rod": {
-        name: "Block Destroyer",
+        name: "Small Dig",
         permission: "operator",
         action: (player, blockHit) => {
-            const block = blockHit.block;
-            const pos = block.location;
-            player.sendMessage(`§cDestroying: §f${block.typeId}`);
-            player.runCommand(`setblock ${pos.x} ${pos.y} ${pos.z} air destroy`);
+            const center = blockHit.block.location;
+            const radius = 2;
+            const dimension = player.dimension;
+
+            for (let x = -radius; x <= radius; x++) {
+                for (let y = -radius; y <= radius; y++) {
+                    for (let z = -radius; z <= radius; z++) {
+                        if (x*x + y*y + z*z <= radius*radius) {
+                            try {
+                                const block = dimension.getBlock({
+                                    x: center.x + x,
+                                    y: center.y + y,
+                                    z: center.z + z
+                                });
+                                if (block && block.typeId !== "minecraft:air" && block.typeId !== "minecraft:bedrock") {
+                                    block.setType("minecraft:air");
+                                }
+                            } catch (e) {}
+                        }
+                    }
+                }
+            }
         }
     },
 
@@ -65,63 +81,34 @@ export const ABILITIES = {
         }
     },
 
-    // Fire Charge - NUKE! destroys blocks in sphere (async to prevent hang)
+    // Fire Charge - big dig (radius 8 sphere, single tick)
     "minecraft:fire_charge": {
-        name: "Nuke",
+        name: "Big Dig",
         permission: "operator",
         maxDistance: 100,
         action: (player, blockHit) => {
             const center = blockHit.block.location;
-            const radius = 20;
+            const radius = 8;
             const dimension = player.dimension;
-            const blocksPerTick = 5000;
 
-            player.sendMessage(`§c§lNUKE INITIATED! §r§7Radius: ${radius} blocks...`);
-
-            let currentX = -radius;
-            let currentY = -radius;
-            let currentZ = -radius;
-            let destroyed = 0;
-            let done = false;
-
-            const intervalId = system.runInterval(() => {
-                let processed = 0;
-
-                while (!done && processed < blocksPerTick) {
-                    if (currentX*currentX + currentY*currentY + currentZ*currentZ <= radius*radius) {
-                        try {
-                            const block = dimension.getBlock({
-                                x: center.x + currentX,
-                                y: center.y + currentY,
-                                z: center.z + currentZ
-                            });
-                            if (block && block.typeId !== "minecraft:air" && block.typeId !== "minecraft:bedrock") {
-                                block.setType("minecraft:air");
-                                destroyed++;
-                            }
-                        } catch (e) {}
-                    }
-                    processed++;
-
-                    currentZ++;
-                    if (currentZ > radius) {
-                        currentZ = -radius;
-                        currentY++;
-                        if (currentY > radius) {
-                            currentY = -radius;
-                            currentX++;
-                            if (currentX > radius) {
-                                done = true;
-                            }
+            for (let x = -radius; x <= radius; x++) {
+                for (let y = -radius; y <= radius; y++) {
+                    for (let z = -radius; z <= radius; z++) {
+                        if (x*x + y*y + z*z <= radius*radius) {
+                            try {
+                                const block = dimension.getBlock({
+                                    x: center.x + x,
+                                    y: center.y + y,
+                                    z: center.z + z
+                                });
+                                if (block && block.typeId !== "minecraft:air" && block.typeId !== "minecraft:bedrock") {
+                                    block.setType("minecraft:air");
+                                }
+                            } catch (e) {}
                         }
                     }
                 }
-
-                if (done) {
-                    system.clearRun(intervalId);
-                    player.sendMessage(`§c§lNUKE COMPLETE! §r§7Destroyed ${destroyed} blocks`);
-                }
-            }, 1);
+            }
         }
     }
 };

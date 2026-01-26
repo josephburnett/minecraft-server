@@ -1,5 +1,6 @@
 import { world, system } from "@minecraft/server";
-import { buildBlocks } from "./structure-builder.js";
+import { buildBlocksAt } from "./structure-builder.js";
+import { getMarker, clearMarker } from "./marker.js";
 
 /**
  * Create a 3D boolean grid initialized to a value
@@ -255,7 +256,7 @@ export function getRotatedSize(size, rotation) {
 }
 
 /**
- * Build a maze at the player's location, facing the direction they're looking
+ * Build a maze at the marker location (if set) or player's location
  * @param {Player} player
  * @param {object} options
  * @param {number} [options.width=15] - Maze width
@@ -269,64 +270,47 @@ export function buildMaze(player, options = {}) {
     const length = options.length || 15;
     const blockType = options.block || "minecraft:stone_bricks";
 
-    player.sendMessage(`§aGenerating ${width}x${height}x${length} maze...`);
+    // Check for stored marker
+    const marker = getMarker();
+    let buildX, buildY, buildZ, rotation, dimension;
+
+    if (marker) {
+        buildX = marker.x;
+        buildY = marker.y;
+        buildZ = marker.z;
+        rotation = marker.rotation;
+        dimension = marker.dimension;
+        player.sendMessage(`§aBuilding ${width}x${height}x${length} maze at marker...`);
+        // Clear the marker after use
+        clearMarker();
+    } else {
+        // Fall back to player position and facing
+        const pos = player.location;
+        buildX = Math.floor(pos.x);
+        buildY = Math.floor(pos.y);
+        buildZ = Math.floor(pos.z);
+        rotation = getPlayerFacing(player).rotation;
+        dimension = player.dimension;
+        player.sendMessage(`§aGenerating ${width}x${height}x${length} maze at player...`);
+    }
 
     // Generate the maze
-    const { grid, size, entrance } = generateMazeGrid(width, height, length);
+    const { grid, size } = generateMazeGrid(width, height, length);
 
     // Convert to blocks
     let blocks = gridToBlocks(grid, blockType);
 
-    // Get player facing direction
-    const facing = getPlayerFacing(player);
-
-    // Rotate maze so entrance faces the player
-    // Maze entrance is at z=0 (south side), so we need to rotate based on player facing
-    // If player faces south (0°), no rotation needed - entrance faces them
-    // If player faces west (90°), rotate 90° so entrance faces west
-    // etc.
-    blocks = rotateBlocks(blocks, size, facing.rotation);
-    const rotatedSize = getRotatedSize(size, facing.rotation);
-
-    // Calculate origin so maze appears in front of player
-    // The entrance should be 2 blocks in front of the player
+    // Rotate maze based on marker/player rotation
+    blocks = rotateBlocks(blocks, size, rotation);
+    const rotatedSize = getRotatedSize(size, rotation);
     const [rw, rh, rl] = rotatedSize;
-
-    // Origin offsets to place maze in front of player
-    // We want the entrance (which is now at the side facing the player) to be 2 blocks away
-    let originX, originY, originZ;
-
-    switch (facing.rotation) {
-        case 0:   // Player faces south, entrance at z=0
-            originX = Math.floor(rw / 2);
-            originY = 0;
-            originZ = -2;
-            break;
-        case 90:  // Player faces west, entrance at x=max
-            originX = rw + 1;
-            originY = 0;
-            originZ = Math.floor(rl / 2);
-            break;
-        case 180: // Player faces north, entrance at z=max
-            originX = Math.floor(rw / 2);
-            originY = 0;
-            originZ = rl + 1;
-            break;
-        case 270: // Player faces east, entrance at x=0
-            originX = -2;
-            originY = 0;
-            originZ = Math.floor(rl / 2);
-            break;
-        default:
-            originX = Math.floor(rw / 2);
-            originY = 0;
-            originZ = -2;
-    }
 
     const totalBlocks = blocks.length;
     player.sendMessage(`§7Placing ${totalBlocks} blocks...`);
 
-    buildBlocks(player, blocks, [originX, originY, originZ], (placed) => {
+    // Build at the target location
+    // Origin is [0, 0, 0] - maze builds with corner at marker/player position
+    buildBlocksAt(dimension, buildX, buildY, buildZ, blocks, (placed) => {
         player.sendMessage(`§a§lMaze complete! §r§7${placed} blocks placed`);
         player.sendMessage(`§7Tip: Exit is at the opposite corner`);
     });
