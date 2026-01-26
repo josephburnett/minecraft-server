@@ -1,13 +1,14 @@
 import { describe, it, expect } from 'vitest';
 import {
-    createGrid,
     shuffle,
     generateMazeGrid,
-    gridToBlocks,
     rotateBlocks,
-    getRotatedSize,
     parseMazeOptions
 } from '../bedrock/behavior_packs/burnodd_scripts/scripts/maze.js';
+import {
+    createGrid,
+    gridToBlocks
+} from '../bedrock/behavior_packs/burnodd_scripts/scripts/shapes.js';
 
 describe('createGrid', () => {
     it('creates a 3D grid with correct dimensions', () => {
@@ -185,24 +186,6 @@ describe('rotateBlocks', () => {
     it('preserves y coordinate during rotation', () => {
         const rotated = rotateBlocks([[1, 5, 1, 'stone']], [3, 10, 3], 90);
         expect(rotated[0][1]).toBe(5);
-    });
-});
-
-describe('getRotatedSize', () => {
-    it('returns same size for 0 rotation', () => {
-        expect(getRotatedSize([3, 5, 7], 0)).toEqual([3, 5, 7]);
-    });
-
-    it('returns same size for 180 rotation', () => {
-        expect(getRotatedSize([3, 5, 7], 180)).toEqual([3, 5, 7]);
-    });
-
-    it('swaps width and length for 90 rotation', () => {
-        expect(getRotatedSize([3, 5, 7], 90)).toEqual([7, 5, 3]);
-    });
-
-    it('swaps width and length for 270 rotation', () => {
-        expect(getRotatedSize([3, 5, 7], 270)).toEqual([7, 5, 3]);
     });
 });
 

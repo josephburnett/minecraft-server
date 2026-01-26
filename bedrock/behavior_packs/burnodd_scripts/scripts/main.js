@@ -4,6 +4,8 @@ import { hasPermission } from "./permissions.js";
 import { initChunkReceiver } from "./chunk-receiver.js";
 import { initMazeHandler } from "./maze.js";
 import { initMarkerHandler } from "./marker.js";
+import { initSphereHandler } from "./sphere.js";
+import { initCubeHandler } from "./cube.js";
 
 // =============================================================================
 // MAIN EVENT HANDLER
@@ -39,6 +41,8 @@ world.afterEvents.itemUse.subscribe((event) => {
 initChunkReceiver();
 initMazeHandler();
 initMarkerHandler();
+initSphereHandler();
+initCubeHandler();
 
 // =============================================================================
 // STARTUP
@@ -46,5 +50,5 @@ initMarkerHandler();
 world.afterEvents.worldLoad.subscribe(() => {
     const enabled = Object.entries(ABILITIES).filter(([_, a]) => a.permission !== "disabled");
     world.sendMessage(`§aBurnodd scripts loaded! §7(${enabled.length} abilities active)`);
-    world.sendMessage(`§7Commands: marker, marker_rotate, marker_clear, maze`);
+    world.sendMessage(`§7Commands: marker, maze, sphere, cube`);
 });

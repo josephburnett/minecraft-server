@@ -2,12 +2,12 @@
   "format_version": 2,
   "header": {
     "name": "Burnodd Scripts",
-    "description": "Burnodd Scripts v1.1.4",
-    "uuid": "2ce31f93-8e2e-4ec3-a75d-59156e20c2dd",
+    "description": "Burnodd Scripts v1.1.5",
+    "uuid": "b0102ec9-0024-4e91-83dc-e070be837bd6",
     "version": [
       1,
       1,
-      4
+      5
     ],
     "min_engine_version": [
       1,
@@ -18,20 +18,20 @@
   "modules": [
     {
       "type": "data",
-      "uuid": "dab32a93-8cc0-4624-9b39-3a57688ea657",
+      "uuid": "12ddd291-aa17-4a7c-87a0-388157562b7e",
       "version": [
         1,
         1,
-        4
+        5
       ]
     },
     {
       "type": "script",
-      "uuid": "86eb4582-0149-4340-8491-5eeec5f62b37",
+      "uuid": "e1f0ae74-43f3-4856-8fba-cf740cd36827",
       "version": [
         1,
         1,
-        4
+        5
       ],
       "language": "javascript",
       "entry": "scripts/main.js"
