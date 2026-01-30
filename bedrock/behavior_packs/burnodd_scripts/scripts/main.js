@@ -8,6 +8,15 @@ import { initSphereHandler } from "./sphere.js";
 import { initCubeHandler } from "./cube.js";
 
 // =============================================================================
+// BLOCK PROTECTION
+// =============================================================================
+world.beforeEvents.playerBreakBlock.subscribe((event) => {
+    if (event.block.typeId === "minecraft:obsidian") {
+        event.cancel = true;
+    }
+});
+
+// =============================================================================
 // MAIN EVENT HANDLER
 // =============================================================================
 world.afterEvents.itemUse.subscribe((event) => {

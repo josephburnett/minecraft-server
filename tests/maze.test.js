@@ -126,6 +126,225 @@ describe('generateMazeGrid', () => {
         // A proper maze should have a significant number of passages
         expect(passages).toBeGreaterThan(0);
     });
+
+    it('handles minimum size (5x5x5)', () => {
+        const result = generateMazeGrid(5, 5, 5);
+        const [w, h, l] = result.size;
+
+        expect(w).toBe(5);
+        expect(h).toBe(5);
+        expect(l).toBe(5);
+        expect(result.grid[result.entrance[0]][1][result.entrance[2]]).toBe(false);
+        expect(result.grid[result.exit[0]][1][result.exit[2]]).toBe(false);
+    });
+
+    it('handles even dimensions by rounding up to odd', () => {
+        const result = generateMazeGrid(10, 6, 12);
+        const [w, h, l] = result.size;
+
+        expect(w).toBe(11);
+        expect(h).toBe(7);
+        expect(l).toBe(13);
+    });
+
+    it('handles medium size (31x7x31)', () => {
+        const result = generateMazeGrid(31, 7, 31);
+        const [w, h, l] = result.size;
+
+        expect(w).toBe(31);
+        expect(l).toBe(31);
+        expect(result.grid[result.entrance[0]][1][result.entrance[2]]).toBe(false);
+        expect(result.grid[result.exit[0]][1][result.exit[2]]).toBe(false);
+    });
+});
+
+// BFS helper used by multiple tests
+function bfs(grid, size, start, end) {
+    const [w, , l] = size;
+    const directions = [[0, 1], [0, -1], [1, 0], [-1, 0]];
+    const visited = new Set();
+    const prev = {};
+    const queue = [start.join(",")];
+    visited.add(queue[0]);
+
+    while (queue.length > 0) {
+        const key = queue.shift();
+        const [sx, sz] = key.split(",").map(Number);
+
+        if (sx === end[0] && sz === end[1]) {
+            // Reconstruct path
+            const path = [];
+            let k = key;
+            while (k) {
+                path.unshift(k.split(",").map(Number));
+                k = prev[k];
+            }
+            return path;
+        }
+
+        for (const [dx, dz] of directions) {
+            const nx = sx + dx;
+            const nz = sz + dz;
+            const nk = nx + "," + nz;
+            if (nx >= 0 && nx < w && nz >= 0 && nz < l && !visited.has(nk) && !grid[nx][1][nz]) {
+                visited.add(nk);
+                prev[nk] = key;
+                queue.push(nk);
+            }
+        }
+    }
+    return null; // no path
+}
+
+describe('maze solvability', () => {
+    it('has a path from entrance to exit (small maze)', () => {
+        const { grid, size, entrance, exit } = generateMazeGrid(7, 5, 7);
+        const path = bfs(grid, size, [entrance[0], entrance[2]], [exit[0], exit[2]]);
+        expect(path).not.toBeNull();
+        expect(path.length).toBeGreaterThan(1);
+    });
+
+    it('has a path from entrance to exit (medium maze)', () => {
+        const { grid, size, entrance, exit } = generateMazeGrid(15, 7, 15);
+        const path = bfs(grid, size, [entrance[0], entrance[2]], [exit[0], exit[2]]);
+        expect(path).not.toBeNull();
+    });
+
+    it('has a path from entrance to exit (large maze)', () => {
+        const { grid, size, entrance, exit } = generateMazeGrid(31, 7, 31);
+        const path = bfs(grid, size, [entrance[0], entrance[2]], [exit[0], exit[2]]);
+        expect(path).not.toBeNull();
+    });
+
+    it('has a path from entrance to exit (edge case 5x5x5)', () => {
+        const { grid, size, entrance, exit } = generateMazeGrid(5, 5, 5);
+        const path = bfs(grid, size, [entrance[0], entrance[2]], [exit[0], exit[2]]);
+        expect(path).not.toBeNull();
+    });
+
+    it('is solvable across multiple random seeds', () => {
+        // Run 10 times to catch intermittent generation bugs
+        for (let i = 0; i < 10; i++) {
+            const { grid, size, entrance, exit } = generateMazeGrid(15, 7, 15);
+            const path = bfs(grid, size, [entrance[0], entrance[2]], [exit[0], exit[2]]);
+            expect(path).not.toBeNull();
+        }
+    });
+});
+
+describe('maze post-processing: loops', () => {
+    it('contains cycles (walls removed between carved cells)', () => {
+        // Generate a large enough maze that loops are statistically certain
+        const { grid, size } = generateMazeGrid(31, 7, 31);
+        const [w, , l] = size;
+
+        // Count wall positions between two carved cells that have been opened
+        // In a pure spanning tree, every wall between cells is intact except
+        // the carved passages. Loops create extra openings.
+        // We detect loops by finding carved cells with >2 open neighbors.
+        let multiConnected = 0;
+        const directions = [[0, 1], [0, -1], [1, 0], [-1, 0]];
+
+        for (let x = 1; x < w - 1; x += 2) {
+            for (let z = 1; z < l - 1; z += 2) {
+                if (grid[x][1][z]) continue; // wall, not a cell
+                let openNeighbors = 0;
+                for (const [dx, dz] of directions) {
+                    const nx = x + dx;
+                    const nz = z + dz;
+                    if (nx >= 0 && nx < w && nz >= 0 && nz < l && !grid[nx][1][nz]) {
+                        openNeighbors++;
+                    }
+                }
+                if (openNeighbors > 2) multiConnected++;
+            }
+        }
+
+        // In a spanning tree, leaf cells have exactly 1 neighbor and internal
+        // cells have 2+. With loops added, some cells will have 3-4 neighbors.
+        // On a 31x31 maze with 20% wall removal, we expect many such cells.
+        expect(multiConnected).toBeGreaterThan(0);
+    });
+});
+
+describe('maze post-processing: dead end extension', () => {
+    it('has dead ends present in the maze', () => {
+        const { grid, size } = generateMazeGrid(15, 7, 15);
+        const [w, , l] = size;
+        const directions = [[0, 1], [0, -1], [1, 0], [-1, 0]];
+
+        let deadEnds = 0;
+        for (let x = 1; x < w - 1; x += 2) {
+            for (let z = 1; z < l - 1; z += 2) {
+                if (grid[x][1][z]) continue;
+                let openNeighbors = 0;
+                for (const [dx, dz] of directions) {
+                    const nx = x + dx;
+                    const nz = z + dz;
+                    if (nx >= 0 && nx < w && nz >= 0 && nz < l && !grid[nx][1][nz]) {
+                        openNeighbors++;
+                    }
+                }
+                if (openNeighbors === 1) deadEnds++;
+            }
+        }
+
+        // Maze should still have dead ends (not all eliminated)
+        expect(deadEnds).toBeGreaterThan(0);
+    });
+});
+
+describe('maze post-processing: deceptive rooms', () => {
+    it('contains open areas larger than a single cell on large mazes', () => {
+        // On a 31x31 maze, rooms should create 2x2+ open areas
+        const { grid, size } = generateMazeGrid(31, 7, 31);
+        const [w, , l] = size;
+
+        // Look for 2x2 open areas (all four grid positions carved)
+        let openAreas = 0;
+        for (let x = 1; x < w - 2; x++) {
+            for (let z = 1; z < l - 2; z++) {
+                if (!grid[x][1][z] && !grid[x+1][1][z] &&
+                    !grid[x][1][z+1] && !grid[x+1][1][z+1]) {
+                    openAreas++;
+                }
+            }
+        }
+
+        // Should have at least one 2x2 open area from rooms or loop removal
+        expect(openAreas).toBeGreaterThan(0);
+    });
+});
+
+describe('maze outer walls integrity', () => {
+    it('maintains outer walls except at entrance and exit', () => {
+        const { grid, size, entrance, exit } = generateMazeGrid(15, 7, 15);
+        const [w, h, l] = size;
+
+        for (let x = 0; x < w; x++) {
+            for (let y = 1; y < h - 1; y++) {
+                // z=0 wall (entrance side)
+                if (x === entrance[0] && y >= 1 && y < h - 1) continue;
+                expect(grid[x][y][0]).toBe(true);
+            }
+        }
+
+        for (let x = 0; x < w; x++) {
+            for (let y = 1; y < h - 1; y++) {
+                // z=max wall (exit side)
+                if (x === exit[0] && y >= 1 && y < h - 1) continue;
+                expect(grid[x][y][l - 1]).toBe(true);
+            }
+        }
+
+        // x=0 and x=max walls should be fully intact
+        for (let y = 1; y < h - 1; y++) {
+            for (let z = 0; z < l; z++) {
+                expect(grid[0][y][z]).toBe(true);
+                expect(grid[w - 1][y][z]).toBe(true);
+            }
+        }
+    });
 });
 
 describe('gridToBlocks', () => {

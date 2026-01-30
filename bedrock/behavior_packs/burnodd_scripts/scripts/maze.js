@@ -17,7 +17,7 @@ export function shuffle(array) {
 }
 
 /**
- * Generate a maze grid using recursive backtracking
+ * Generate a maze grid using growing tree algorithm with post-processing
  * @param {number} width - X dimension (will be made odd)
  * @param {number} height - Y dimension (will be made odd)
  * @param {number} length - Z dimension (will be made odd)
@@ -65,7 +65,7 @@ export function generateMazeGrid(width, height, length) {
         }
     }
 
-    // Carve passage between two cells
+    // Carve passage between two cells (removes the wall between them)
     function carvePassage(cx1, cz1, cx2, cz2) {
         const [gx1, gz1] = cellToGrid(cx1, cz1);
         const [gx2, gz2] = cellToGrid(cx2, cz2);
@@ -77,45 +77,46 @@ export function generateMazeGrid(width, height, length) {
         }
     }
 
-    // Recursive backtracking maze generation (iterative to avoid stack overflow)
+    // Growing tree maze generation (75% newest / 25% random)
     function generateMaze(startCx, startCz) {
-        const stack = [[startCx, startCz]];
+        visited[startCx][startCz] = true;
+        const [sgx, sgz] = cellToGrid(startCx, startCz);
+        carveCell(sgx, sgz);
 
-        while (stack.length > 0) {
-            const [cx, cz] = stack[stack.length - 1];
+        const active = [[startCx, startCz]];
 
-            if (!visited[cx][cz]) {
-                visited[cx][cz] = true;
-                const [gx, gz] = cellToGrid(cx, cz);
-                carveCell(gx, gz);
-            }
+        while (active.length > 0) {
+            // Pick cell: 75% newest, 25% random
+            const idx = Math.random() < 0.75
+                ? active.length - 1
+                : Math.floor(Math.random() * active.length);
+            const [cx, cz] = active[idx];
 
             // Find unvisited neighbors
             const unvisited = [];
-            const dirs = shuffle([...directions]);
-
-            for (const [dx, dz] of dirs) {
+            for (const [dx, dz] of directions) {
                 const nx = cx + dx;
                 const nz = cz + dz;
-
                 if (nx >= 0 && nx < cellsX && nz >= 0 && nz < cellsZ && !visited[nx][nz]) {
-                    unvisited.push([nx, nz, dx, dz]);
+                    unvisited.push([nx, nz]);
                 }
             }
 
             if (unvisited.length > 0) {
-                // Pick a random unvisited neighbor
-                const [nx, nz] = unvisited[0];
+                const pick = unvisited[Math.floor(Math.random() * unvisited.length)];
+                const [nx, nz] = pick;
+                visited[nx][nz] = true;
+                const [ngx, ngz] = cellToGrid(nx, nz);
+                carveCell(ngx, ngz);
                 carvePassage(cx, cz, nx, nz);
-                stack.push([nx, nz]);
+                active.push([nx, nz]);
             } else {
-                // Backtrack
-                stack.pop();
+                active.splice(idx, 1);
             }
         }
     }
 
-    // Generate the maze starting from corner
+    // Generate the base maze starting from corner
     generateMaze(0, 0);
 
     // Create entrance at the front (z=0 side)
@@ -126,6 +127,137 @@ export function generateMazeGrid(width, height, length) {
     // Create exit at the back (z=max side)
     for (let y = 1; y < mazeH - 1; y++) {
         grid[mazeW - 2][y][mazeL - 1] = false;
+    }
+
+    // --- Post-processing ---
+
+    // Check if a cell-space grid position is carved (air)
+    function isCarved(gx, gz) {
+        return gx >= 0 && gx < mazeW && gz >= 0 && gz < mazeL && !grid[gx][1][gz];
+    }
+
+    // 1. Extend dead ends — 40% chance to carve one cell deeper
+    for (let cx = 0; cx < cellsX; cx++) {
+        for (let cz = 0; cz < cellsZ; cz++) {
+            const [gx, gz] = cellToGrid(cx, cz);
+            if (!isCarved(gx, gz)) continue;
+
+            // A dead end in cell space: only 1 carved neighbor among the
+            // wall positions (the passages between cells)
+            let openPassages = 0;
+            const blockedDirs = [];
+            for (const [dx, dz] of directions) {
+                const wallGx = gx + dx;
+                const wallGz = gz + dz;
+                if (isCarved(wallGx, wallGz)) {
+                    openPassages++;
+                } else {
+                    // Could extend in this direction if neighbor cell exists
+                    const ncx = cx + dx;
+                    const ncz = cz + dz;
+                    if (ncx >= 0 && ncx < cellsX && ncz >= 0 && ncz < cellsZ) {
+                        blockedDirs.push([dx, dz]);
+                    }
+                }
+            }
+
+            if (openPassages === 1 && blockedDirs.length > 0 && Math.random() < 0.4) {
+                const [dx, dz] = blockedDirs[Math.floor(Math.random() * blockedDirs.length)];
+                carvePassage(cx, cz, cx + dx, cz + dz);
+            }
+        }
+    }
+
+    // 2. Compute solution path via BFS from entrance to exit (grid coords)
+    const entrance = [1, 0];  // gx, gz of entrance opening
+    const exit = [mazeW - 2, mazeL - 1];
+
+    const solutionSet = new Set();
+    {
+        const prev = {};
+        const queue = [entrance.join(",")];
+        const visitedBFS = new Set(queue);
+
+        while (queue.length > 0) {
+            const key = queue.shift();
+            const [sx, sz] = key.split(",").map(Number);
+
+            if (sx === exit[0] && sz === exit[1]) {
+                // Trace back and record solution cells
+                let k = key;
+                while (k) {
+                    solutionSet.add(k);
+                    k = prev[k];
+                }
+                break;
+            }
+
+            for (const [dx, dz] of directions) {
+                const nx = sx + dx;
+                const nz = sz + dz;
+                const nk = nx + "," + nz;
+                if (!visitedBFS.has(nk) && isCarved(nx, nz)) {
+                    visitedBFS.add(nk);
+                    prev[nk] = key;
+                    queue.push(nk);
+                }
+            }
+        }
+    }
+
+    function isOnSolution(gx, gz) {
+        return solutionSet.has(gx + "," + gz);
+    }
+
+    // 3. Add loops (~20% of internal walls between carved cells removed)
+    // Walls that separate two carved cells sit at odd+even or even+odd grid positions
+    for (let gx = 1; gx < mazeW - 1; gx++) {
+        for (let gz = 1; gz < mazeL - 1; gz++) {
+            if (!grid[gx][1][gz]) continue; // already carved
+
+            // Check if this wall separates two carved cells
+            // Horizontal wall (between cells differing in X)
+            if (gx % 2 === 0 && gz % 2 === 1) {
+                if (isCarved(gx - 1, gz) && isCarved(gx + 1, gz)) {
+                    // Bias away from solution: 5% if either side on solution, 20% otherwise
+                    const chance = (isOnSolution(gx - 1, gz) || isOnSolution(gx + 1, gz)) ? 0.05 : 0.20;
+                    if (Math.random() < chance) {
+                        carveCell(gx, gz);
+                    }
+                }
+            }
+            // Vertical wall (between cells differing in Z)
+            if (gx % 2 === 1 && gz % 2 === 0) {
+                if (isCarved(gx, gz - 1) && isCarved(gx, gz + 1)) {
+                    const chance = (isOnSolution(gx, gz - 1) || isOnSolution(gx, gz + 1)) ? 0.05 : 0.20;
+                    if (Math.random() < chance) {
+                        carveCell(gx, gz);
+                    }
+                }
+            }
+        }
+    }
+
+    // 4. Create deceptive rooms — small 2x2 or 3x3 cell clusters biased toward exit half
+    const roomAttempts = Math.floor(cellsX * cellsZ * 0.05);
+    for (let i = 0; i < roomAttempts; i++) {
+        const roomSize = Math.random() < 0.5 ? 2 : 3;
+        // Bias toward exit half (higher Z)
+        const rcx = Math.floor(Math.random() * (cellsX - roomSize + 1));
+        const halfZ = Math.floor(cellsZ / 2);
+        const rcz = halfZ + Math.floor(Math.random() * (cellsZ - roomSize + 1 - halfZ));
+        if (rcz + roomSize > cellsZ) continue;
+
+        // Remove all internal walls and pillars within this cell cluster
+        const [roomGxMin] = cellToGrid(rcx, rcz);
+        const [roomGxMax] = cellToGrid(rcx + roomSize - 1, rcz);
+        const [, roomGzMin] = cellToGrid(rcx, rcz);
+        const [, roomGzMax] = cellToGrid(rcx, rcz + roomSize - 1);
+        for (let gx = roomGxMin; gx <= roomGxMax; gx++) {
+            for (let gz = roomGzMin; gz <= roomGzMax; gz++) {
+                carveCell(gx, gz);
+            }
+        }
     }
 
     return {
@@ -210,12 +342,23 @@ export function buildMaze(player, options = {}) {
 
     // Generate the maze
     const { grid, size } = generateMazeGrid(width, height, length);
+    const [mazeW, mazeH, mazeL] = size;
 
     // Convert to blocks
     let blocks = gridToBlocks(grid, blockType);
 
     // Rotate maze based on marker/player rotation
     blocks = rotateBlocks(blocks, size, rotation);
+
+    // Effective dimensions after rotation (90°/270° swap width and length)
+    const effectiveW = (rotation === 90 || rotation === 270) ? mazeL : mazeW;
+    const effectiveL = (rotation === 90 || rotation === 270) ? mazeW : mazeL;
+
+    // Center horizontally and place below the reference point
+    // Ceiling ends up at buildY - 1, floor at buildY - mazeH
+    buildX -= Math.floor(effectiveW / 2);
+    buildZ -= Math.floor(effectiveL / 2);
+    buildY -= mazeH;
 
     const totalBlocks = blocks.length;
     player.sendMessage(`§7Placing ${totalBlocks} blocks...`);
