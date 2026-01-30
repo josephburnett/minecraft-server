@@ -3,16 +3,29 @@
  * Provides minimal implementations for testing
  */
 
+// Subscriber store — tests can inspect registered callbacks
+export const _subscribers = {
+  beforePlayerBreakBlock: [],
+  afterItemUse: [],
+  afterWorldLoad: [],
+  afterScriptEventReceive: []
+};
+
 // Mock world object
 export const world = {
   getAllPlayers: () => [],
   sendMessage: (msg) => console.log('[world]', msg),
+  beforeEvents: {
+    playerBreakBlock: {
+      subscribe: (callback) => { _subscribers.beforePlayerBreakBlock.push(callback); }
+    }
+  },
   afterEvents: {
     itemUse: {
-      subscribe: (callback) => {}
+      subscribe: (callback) => { _subscribers.afterItemUse.push(callback); }
     },
     worldLoad: {
-      subscribe: (callback) => {}
+      subscribe: (callback) => { _subscribers.afterWorldLoad.push(callback); }
     }
   }
 };
@@ -28,7 +41,7 @@ export const system = {
   },
   afterEvents: {
     scriptEventReceive: {
-      subscribe: (callback) => {}
+      subscribe: (callback) => { _subscribers.afterScriptEventReceive.push(callback); }
     }
   }
 };

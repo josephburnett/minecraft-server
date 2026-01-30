@@ -36,7 +36,7 @@ export const ABILITIES = {
                                     y: center.y + y,
                                     z: center.z + z
                                 });
-                                if (block && block.typeId !== "minecraft:air" && block.typeId !== "minecraft:bedrock") {
+                                if (block && block.typeId !== "minecraft:air" && block.typeId !== "minecraft:bedrock" && block.typeId !== "minecraft:obsidian") {
                                     block.setType("minecraft:air");
                                 }
                             } catch (e) {}
@@ -101,7 +101,7 @@ export const ABILITIES = {
                                     y: center.y + y,
                                     z: center.z + z
                                 });
-                                if (block && block.typeId !== "minecraft:air" && block.typeId !== "minecraft:bedrock") {
+                                if (block && block.typeId !== "minecraft:air" && block.typeId !== "minecraft:bedrock" && block.typeId !== "minecraft:obsidian") {
                                     block.setType("minecraft:air");
                                 }
                             } catch (e) {}
