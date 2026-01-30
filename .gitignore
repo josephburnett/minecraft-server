@@ -6,6 +6,9 @@
 # Node modules
 node_modules/
 
+# Test coverage
+coverage/
+
 # World data (stored in Docker volume, back up separately)
 bedrock/worlds/
 
