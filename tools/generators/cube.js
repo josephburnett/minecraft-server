@@ -9,7 +9,7 @@
  * Outputs a scriptevent command to generate the cube
  */
 
-const { createBitfieldStructure, toChunks, createGrid } = require('../lib/structure.js');
+import { createBitfieldStructure, toChunks, createGrid } from '../lib/structure.js';
 
 // Parse arguments
 const args = process.argv.slice(2);

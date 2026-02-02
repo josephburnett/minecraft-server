@@ -10,7 +10,7 @@
  * Outputs a scriptevent command to generate the pattern
  */
 
-const { createSparseStructure, toChunks } = require('../lib/structure.js');
+import { createSparseStructure, toChunks } from '../lib/structure.js';
 
 // Parse arguments
 const args = process.argv.slice(2);

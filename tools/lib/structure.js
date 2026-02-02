@@ -172,7 +172,7 @@ function createNumericGrid(width, height, length, value = 0) {
     return grid;
 }
 
-module.exports = {
+export {
     encodeBitfield,
     encodePalette,
     createBitfieldStructure,
