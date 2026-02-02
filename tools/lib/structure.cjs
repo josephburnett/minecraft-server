@@ -116,7 +116,10 @@ function createSparseStructure(origin, blocks) {
 function toChunks(structure) {
     const json = JSON.stringify(structure);
     const base64 = Buffer.from(json).toString('base64');
-    const maxChunkSize = 1500;
+    // Bedrock Realms enforce a 512-character limit on commands.
+    // Full command: /scriptevent burnodd:chunk {sessionId}:{i}:{total}:{data}
+    // Overhead is ~45 chars, leaving ~467 for data. Use 400 for safety.
+    const maxChunkSize = 400;
 
     const sessionId = Math.random().toString(36).substring(2, 8);
     const chunks = [];
@@ -172,6 +175,81 @@ function createNumericGrid(width, height, length, value = 0) {
     return grid;
 }
 
+/**
+ * Convert a structure to block placement lines (CSV format: x,y,z,block_name).
+ * Used for direct block placement via InventoryTransaction packets.
+ * @param {object} structure - structure object (bitfield, palette, or sparse)
+ * @returns {string[]} array of "x,y,z,block_name" lines
+ */
+function toBlocks(structure) {
+    const lines = [];
+
+    if (structure.type === "sparse") {
+        for (const [x, y, z, blockName] of structure.blocks) {
+            lines.push(`${x},${y},${z},${blockName}`);
+        }
+    } else if (structure.type === "bitfield") {
+        const [width, height, length] = structure.size;
+        // Decode the bitfield back to get block positions
+        const bytes = Buffer.from(structure.data, 'base64');
+        let bitIndex = 0;
+        for (let x = 0; x < width; x++) {
+            for (let y = 0; y < height; y++) {
+                for (let z = 0; z < length; z++) {
+                    const byteIdx = Math.floor(bitIndex / 8);
+                    const bitIdx = 7 - (bitIndex % 8);
+                    if (byteIdx < bytes.length && (bytes[byteIdx] >> bitIdx) & 1) {
+                        lines.push(`${x},${y},${z},${structure.block}`);
+                    }
+                    bitIndex++;
+                }
+            }
+        }
+    } else if (structure.type === "palette") {
+        const [width, height, length] = structure.size;
+        const bytes = Buffer.from(structure.data, 'base64');
+        let idx = 0;
+        for (let x = 0; x < width; x++) {
+            for (let y = 0; y < height; y++) {
+                for (let z = 0; z < length; z++) {
+                    const paletteIdx = bytes[idx];
+                    if (paletteIdx > 0 && paletteIdx < structure.palette.length) {
+                        lines.push(`${x},${y},${z},${structure.palette[paletteIdx]}`);
+                    }
+                    idx++;
+                }
+            }
+        }
+    }
+
+    return lines;
+}
+
+/**
+ * Convert a 3D boolean grid directly to block placement lines.
+ * More efficient than going through the bitfield encoding.
+ * @param {boolean[][][]} grid - 3D array [x][y][z]
+ * @param {string} block - block type name
+ * @returns {string[]} array of "x,y,z,block_name" lines
+ */
+function gridToBlocks(grid, block) {
+    const lines = [];
+    const width = grid.length;
+    const height = grid[0]?.length || 0;
+    const length = grid[0]?.[0]?.length || 0;
+
+    for (let x = 0; x < width; x++) {
+        for (let y = 0; y < height; y++) {
+            for (let z = 0; z < length; z++) {
+                if (grid[x][y][z]) {
+                    lines.push(`${x},${y},${z},${block}`);
+                }
+            }
+        }
+    }
+    return lines;
+}
+
 module.exports = {
     encodeBitfield,
     encodePalette,
@@ -179,6 +257,8 @@ module.exports = {
     createPaletteStructure,
     createSparseStructure,
     toChunks,
+    toBlocks,
+    gridToBlocks,
     createGrid,
     createNumericGrid
 };

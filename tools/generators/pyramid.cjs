@@ -9,7 +9,7 @@
  * Outputs a scriptevent command to generate the pyramid
  */
 
-const { createBitfieldStructure, toChunks, createGrid } = require('../lib/structure.js');
+const { createBitfieldStructure, toChunks, gridToBlocks, createGrid } = require('../lib/structure.cjs');
 
 // Parse arguments
 const args = process.argv.slice(2);
@@ -42,15 +42,18 @@ for (let y = 0; y < height; y++) {
 const center = Math.floor(base / 2);
 const origin = [center, 0, center];
 
-// Create and output the structure
-const structure = createBitfieldStructure(
-    [base, height, base],
-    origin,
-    block,
-    grid
-);
-
-toChunks(structure).forEach(chunk => console.log(chunk));
+// Output in the requested format
+if (args.includes('--blocks')) {
+    gridToBlocks(grid, block).forEach(line => console.log(line));
+} else {
+    const structure = createBitfieldStructure(
+        [base, height, base],
+        origin,
+        block,
+        grid
+    );
+    toChunks(structure).forEach(chunk => console.log(chunk));
+}
 
 // Print info to stderr
 console.error(`Generated pyramid with base ${base}x${base} and height ${height}`);
