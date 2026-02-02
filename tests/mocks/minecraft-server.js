@@ -6,9 +6,9 @@
 // Subscriber store — tests can inspect registered callbacks
 export const _subscribers = {
   beforePlayerBreakBlock: [],
+  beforeChatSend: [],
   afterItemUse: [],
-  afterWorldLoad: [],
-  afterScriptEventReceive: []
+  afterWorldLoad: []
 };
 
 // Mock world object
@@ -18,6 +18,9 @@ export const world = {
   beforeEvents: {
     playerBreakBlock: {
       subscribe: (callback) => { _subscribers.beforePlayerBreakBlock.push(callback); }
+    },
+    chatSend: {
+      subscribe: (callback) => { _subscribers.beforeChatSend.push(callback); }
     }
   },
   afterEvents: {
@@ -39,10 +42,8 @@ export const system = {
   clearRun: (id) => {
     clearInterval(id);
   },
-  afterEvents: {
-    scriptEventReceive: {
-      subscribe: (callback) => { _subscribers.afterScriptEventReceive.push(callback); }
-    }
+  run: (callback) => {
+    callback();
   }
 };
 

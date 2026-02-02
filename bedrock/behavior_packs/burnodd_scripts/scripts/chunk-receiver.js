@@ -5,19 +5,11 @@ import { base64Decode, buildStructure } from "./structure-builder.js";
 const chunkSessions = {};
 
 /**
- * Get first online player
- * @returns {Player|null}
- */
-function getFirstPlayer() {
-    const players = world.getAllPlayers();
-    return players.length > 0 ? players[0] : null;
-}
-
-/**
  * Handle incoming chunk data
  * @param {string} message - Format: sessionId:chunkIndex:totalChunks:data
+ * @param {Player} player - The player who sent the chunk
  */
-function handleChunk(message) {
+function handleChunk(message, player) {
     const colonIdx1 = message.indexOf(":");
     const colonIdx2 = message.indexOf(":", colonIdx1 + 1);
     const colonIdx3 = message.indexOf(":", colonIdx2 + 1);
@@ -50,28 +42,26 @@ function handleChunk(message) {
             .map(b => String.fromCharCode(b))
             .join("");
         const structure = JSON.parse(json);
-        const player = getFirstPlayer();
-
-        if (!player) {
-            world.sendMessage("§cNo players online to build structure!");
-            return;
-        }
 
         buildStructure(player, structure);
     }
 }
 
 /**
- * Initialize the chunk receiver scriptevent handler
+ * Initialize the chunk receiver chat message handler
  */
 export function initChunkReceiver() {
-    system.afterEvents.scriptEventReceive.subscribe((event) => {
-        if (event.id === "burnodd:chunk") {
-            try {
-                handleChunk(event.message);
-            } catch (e) {
-                world.sendMessage(`§cChunk transfer failed: ${e.message}`);
-            }
+    world.beforeEvents.chatSend.subscribe((event) => {
+        if (event.message.startsWith("!chunk ")) {
+            event.cancel = true;
+            const data = event.message.substring(7);
+            system.run(() => {
+                try {
+                    handleChunk(data, event.sender);
+                } catch (e) {
+                    world.sendMessage(`§cChunk transfer failed: ${e.message}`);
+                }
+            });
         }
     });
 }

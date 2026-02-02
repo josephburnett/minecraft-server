@@ -16,14 +16,12 @@ import (
 
 	"github.com/sandertv/gophertunnel/minecraft"
 	"github.com/sandertv/gophertunnel/minecraft/auth"
-	"github.com/sandertv/gophertunnel/minecraft/protocol"
 	"github.com/sandertv/gophertunnel/minecraft/protocol/packet"
 	"github.com/sandertv/gophertunnel/minecraft/realms"
 	"golang.org/x/oauth2"
 )
 
 const tokenFile = ".realm-token"
-const burnoddPackUUID = "a1b2c3d4-e5f6-7890-abcd-ef1234567890"
 const defaultPackPath = "bedrock/behavior_packs/burnodd_scripts"
 
 func main() {
@@ -133,29 +131,31 @@ func runPing(duration int) error {
 	startTime := time.Now()
 	var totalPackets atomic.Int64
 	var lastTime atomic.Int32
-	var msgCount atomic.Int64
-
-	// Background goroutine: send a chat message every 2 seconds
+	// Test chat message size limits
+	testSizes := []int{256, 512, 1024, 2048}
 	go func() {
-		ticker := time.NewTicker(2 * time.Second)
-		defer ticker.Stop()
-		for {
-			select {
-			case <-ctx.Done():
+		time.Sleep(2 * time.Second)
+		for _, size := range testSizes {
+			if ctx.Err() != nil {
 				return
-			case <-ticker.C:
-				n := msgCount.Add(1)
-				elapsed := time.Since(startTime).Round(time.Second)
-				err := conn.WritePacket(&packet.Text{
-					TextType: packet.TextTypeChat,
-					Message:  fmt.Sprintf("realmctl ping #%d (%s)", n, elapsed),
-				})
-				if err != nil {
-					fmt.Printf("[send] error: %v\n", err)
-					return
-				}
 			}
+			msg := fmt.Sprintf("[%d] ", size)
+			for len(msg) < size {
+				msg += "A"
+			}
+			msg = msg[:size]
+			err := conn.WritePacket(&packet.Text{
+				TextType: packet.TextTypeChat,
+				Message:  msg,
+			})
+			if err != nil {
+				fmt.Printf("[send] %d chars: error: %v\n", size, err)
+				return
+			}
+			fmt.Printf("[send] sent %d chars\n", size)
+			time.Sleep(2 * time.Second)
 		}
+		fmt.Println("[send] all size tests complete")
 	}()
 
 	// Main goroutine: read loop
@@ -305,33 +305,16 @@ func runChunkUploader(chunksFile string) error {
 		return fmt.Errorf("spawn error: %w", err)
 	}
 
-	// Check for burnodd_scripts pack
-	packFound := false
-	for _, pack := range conn.ResourcePacks() {
-		if pack.UUID().String() == burnoddPackUUID {
-			packFound = true
-			fmt.Printf("Found behavior pack: %s\n", pack.Name())
-			break
-		}
-	}
-	if !packFound {
-		return fmt.Errorf("burnodd_scripts behavior pack not found on Realm!\nPlease run 'make install-pack' first.")
-	}
+	fmt.Println("Connected! Sending chunks as chat messages...")
 
-	fmt.Println("Connected! Sending commands...")
-
-	// Send commands
+	// Send chunks as chat messages
 	for i, chunk := range chunks {
-		cmd := fmt.Sprintf("/scriptevent burnodd:chunk %s", chunk)
-
-		err := conn.WritePacket(&packet.CommandRequest{
-			CommandLine: cmd,
-			CommandOrigin: protocol.CommandOrigin{
-				Origin: protocol.CommandOriginPlayer,
-			},
+		err := conn.WritePacket(&packet.Text{
+			TextType: packet.TextTypeChat,
+			Message:  fmt.Sprintf("!chunk %s", chunk),
 		})
 		if err != nil {
-			return fmt.Errorf("command error: %w", err)
+			return fmt.Errorf("send error: %w", err)
 		}
 
 		if (i+1)%50 == 0 {
@@ -341,7 +324,7 @@ func runChunkUploader(chunksFile string) error {
 		time.Sleep(50 * time.Millisecond)
 	}
 
-	fmt.Printf("Done! Sent %d commands.\n", len(chunks))
+	fmt.Printf("Done! Sent %d chunks.\n", len(chunks))
 	time.Sleep(time.Second)
 	return nil
 }
