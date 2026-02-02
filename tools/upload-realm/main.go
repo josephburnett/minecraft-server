@@ -133,6 +133,30 @@ func runPing(duration int) error {
 	startTime := time.Now()
 	var totalPackets atomic.Int64
 	var lastTime atomic.Int32
+	var msgCount atomic.Int64
+
+	// Background goroutine: send a chat message every 2 seconds
+	go func() {
+		ticker := time.NewTicker(2 * time.Second)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-ticker.C:
+				n := msgCount.Add(1)
+				elapsed := time.Since(startTime).Round(time.Second)
+				err := conn.WritePacket(&packet.Text{
+					TextType: packet.TextTypeChat,
+					Message:  fmt.Sprintf("realmctl ping #%d (%s)", n, elapsed),
+				})
+				if err != nil {
+					fmt.Printf("[send] error: %v\n", err)
+					return
+				}
+			}
+		}
+	}()
 
 	// Main goroutine: read loop
 	packetCounts := make(map[string]int)
