@@ -9,7 +9,7 @@
  * Outputs a scriptevent command to generate the sphere
  */
 
-const { createBitfieldStructure, toChunks, gridToBlocks, createGrid } = require('../lib/structure.cjs');
+const { createBitfieldStructure, toChunks, createGrid } = require('../lib/structure.js');
 
 // Parse arguments
 const args = process.argv.slice(2);
@@ -57,18 +57,15 @@ for (let x = 0; x < size; x++) {
 // Origin: player at center of sphere
 const origin = [center, center, center];
 
-// Output in the requested format
-if (args.includes('--blocks')) {
-    gridToBlocks(grid, block).forEach(line => console.log(line));
-} else {
-    const structure = createBitfieldStructure(
-        [size, size, size],
-        origin,
-        block,
-        grid
-    );
-    toChunks(structure).forEach(chunk => console.log(chunk));
-}
+// Create and output the structure
+const structure = createBitfieldStructure(
+    [size, size, size],
+    origin,
+    block,
+    grid
+);
+
+toChunks(structure).forEach(chunk => console.log(chunk));
 
 // Print info to stderr
 console.error(`Generated ${hollow ? "hollow" : "solid"} sphere with radius ${radius}`);
