@@ -21,7 +21,7 @@ bedrock/behavior_packs/*
 structure.chunks
 
 # Compiled binaries
-tools/upload-realm/upload-realm
+tools/upload-realm/realmctl
 tools/pack-builder/pack-builder
 
 # Realm world backups

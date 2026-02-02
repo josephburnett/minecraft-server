@@ -7,8 +7,11 @@ import (
 	"flag"
 	"fmt"
 	"os"
+	"os/signal"
 	"path/filepath"
 	"strings"
+	"sync/atomic"
+	"syscall"
 	"time"
 
 	"github.com/sandertv/gophertunnel/minecraft"
@@ -32,10 +35,19 @@ func main() {
 	// Flags for chunk uploader mode
 	chunksFile := flag.String("chunks", "structure.chunks", "Path to chunks file")
 
+	// Flags for ping mode
+	ping := flag.Bool("ping", false, "Connect to Realm and send periodic time queries to test connection")
+	duration := flag.Int("duration", 60, "Seconds to stay connected in ping mode (0 = until Ctrl+C)")
+
 	flag.Parse()
 
 	if *installPack {
 		if err := runPackInstaller(*packPath, *noBackup); err != nil {
+			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+			os.Exit(1)
+		}
+	} else if *ping {
+		if err := runPing(*duration); err != nil {
 			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 			os.Exit(1)
 		}
@@ -45,6 +57,140 @@ func main() {
 			os.Exit(1)
 		}
 	}
+}
+
+func runPing(duration int) error {
+	inviteCode, err := getRealmInvite()
+	if err != nil {
+		return err
+	}
+
+	tokenSource, err := getTokenSource()
+	if err != nil {
+		return fmt.Errorf("auth error: %w", err)
+	}
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	// Set up OS signal listener for clean shutdown
+	sigCh := make(chan os.Signal, 1)
+	signal.Notify(sigCh, syscall.SIGINT, syscall.SIGTERM)
+	go func() {
+		<-sigCh
+		fmt.Println("\nReceived interrupt, shutting down...")
+		cancel()
+	}()
+
+	// If duration > 0, set a timer to cancel
+	if duration > 0 {
+		time.AfterFunc(time.Duration(duration)*time.Second, func() {
+			fmt.Printf("\nDuration (%ds) expired, shutting down...\n", duration)
+			cancel()
+		})
+	}
+
+	realmsClient := realms.NewClient(tokenSource, nil)
+	fmt.Println("Looking up Realm...")
+	realm, err := realmsClient.Realm(ctx, inviteCode)
+	if err != nil {
+		return fmt.Errorf("realm lookup error: %w", err)
+	}
+
+	address, err := realm.Address(ctx)
+	if err != nil {
+		return fmt.Errorf("realm address error: %w", err)
+	}
+
+	fmt.Printf("Connecting to %s (%s)...\n", realm.Name, address)
+
+	dialer := minecraft.Dialer{
+		TokenSource: tokenSource,
+	}
+
+	conn, err := dialer.Dial("raknet", address)
+	if err != nil {
+		return fmt.Errorf("connection error: %w", err)
+	}
+	defer conn.Close()
+
+	if err := conn.DoSpawn(); err != nil {
+		return fmt.Errorf("spawn error: %w", err)
+	}
+
+	// Log GameData summary
+	gd := conn.GameData()
+	fmt.Printf("Spawned! World: %s, Gamemode: %d, Position: (%.1f, %.1f, %.1f)\n",
+		gd.WorldName, gd.PlayerGameMode,
+		gd.PlayerPosition.X(), gd.PlayerPosition.Y(), gd.PlayerPosition.Z())
+
+	if duration > 0 {
+		fmt.Printf("Ping mode active for %ds (Ctrl+C to stop early)...\n", duration)
+	} else {
+		fmt.Println("Ping mode active (Ctrl+C to stop)...")
+	}
+
+	startTime := time.Now()
+	var totalPackets atomic.Int64
+	var lastTime atomic.Int32
+
+	// Main goroutine: read loop
+	packetCounts := make(map[string]int)
+	lastSummary := time.Now()
+	lastTimePrint := time.Now()
+
+	for {
+		pk, err := conn.ReadPacket()
+		if err != nil {
+			// Check if context was cancelled (clean shutdown)
+			if ctx.Err() != nil {
+				break
+			}
+			fmt.Printf("[read] error: %v\n", err)
+			break
+		}
+		totalPackets.Add(1)
+
+		switch p := pk.(type) {
+		case *packet.SetTime:
+			lastTime.Store(int32(p.Time))
+			if time.Since(lastTimePrint) >= 2*time.Second {
+				fmt.Printf("[time] %d (tick)\n", p.Time)
+				lastTimePrint = time.Now()
+			}
+		case *packet.Text:
+			fmt.Printf("[chat] (%d) %s: %s\n", p.TextType, p.SourceName, p.Message)
+		case *packet.PacketViolationWarning:
+			fmt.Printf("[violation] severity=%d type=%d packetID=%d: %s\n",
+				p.Severity, p.Type, p.PacketID, p.ViolationContext)
+		case *packet.Disconnect:
+			fmt.Printf("[disconnect] %s\n", p.Message)
+			cancel()
+		default:
+			name := fmt.Sprintf("%T", pk)
+			packetCounts[name]++
+		}
+
+		// Summarize packet counts every 10 seconds
+		if time.Since(lastSummary) >= 10*time.Second && len(packetCounts) > 0 {
+			fmt.Printf("[summary] packets in last 10s:")
+			for name, count := range packetCounts {
+				fmt.Printf(" %s=%d", name, count)
+			}
+			fmt.Println()
+			packetCounts = make(map[string]int)
+			lastSummary = time.Now()
+		}
+
+		if ctx.Err() != nil {
+			break
+		}
+	}
+
+	elapsed := time.Since(startTime)
+	fmt.Printf("Session ended. Duration: %s, Packets received: %d\n",
+		elapsed.Round(time.Second), totalPackets.Load())
+	return nil
 }
 
 func runPackInstaller(packPath string, noBackup bool) error {
