@@ -94,8 +94,10 @@ func runPing(duration int) error {
 			}
 			msg = msg[:size]
 			err := rc.Conn.WritePacket(&packet.Text{
-				TextType: packet.TextTypeChat,
-				Message:  msg,
+				TextType:   packet.TextTypeChat,
+				SourceName: rc.DisplayName,
+				XUID:       rc.XUID,
+				Message:    msg,
 			})
 			if err != nil {
 				fmt.Printf("[send] %d chars: error: %v\n", size, err)
@@ -226,8 +228,10 @@ func runChunkUploader(chunksFile string) error {
 		}
 
 		err := rc.Conn.WritePacket(&packet.Text{
-			TextType: packet.TextTypeChat,
-			Message:  fmt.Sprintf("!chunk %s", chunk),
+			TextType:   packet.TextTypeChat,
+			SourceName: rc.DisplayName,
+			XUID:       rc.XUID,
+			Message:    fmt.Sprintf("!chunk %s", chunk),
 		})
 		if err != nil {
 			return fmt.Errorf("send error at chunk %d: %w", i+1, err)

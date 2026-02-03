@@ -13,9 +13,11 @@ import (
 
 // RealmConn bundles a Minecraft connection with its context and cancel function.
 type RealmConn struct {
-	Conn   *minecraft.Conn
-	Ctx    context.Context
-	Cancel context.CancelFunc
+	Conn        *minecraft.Conn
+	Ctx         context.Context
+	Cancel      context.CancelFunc
+	DisplayName string
+	XUID        string
 }
 
 // dialRealm performs the full connection sequence: invite lookup, auth, realm
@@ -66,11 +68,19 @@ func dialRealm() (*RealmConn, error) {
 	}
 
 	gd := conn.GameData()
+	id := conn.IdentityData()
 	fmt.Printf("Spawned! World: %s, Gamemode: %d, Position: (%.1f, %.1f, %.1f)\n",
 		gd.WorldName, gd.PlayerGameMode,
 		gd.PlayerPosition.X(), gd.PlayerPosition.Y(), gd.PlayerPosition.Z())
+	fmt.Printf("Identity: %s (XUID: %s)\n", id.DisplayName, id.XUID)
 
-	return &RealmConn{Conn: conn, Ctx: ctx, Cancel: cancel}, nil
+	return &RealmConn{
+		Conn:        conn,
+		Ctx:         ctx,
+		Cancel:      cancel,
+		DisplayName: id.DisplayName,
+		XUID:        id.XUID,
+	}, nil
 }
 
 // setupSignalHandler arranges for cancel to be called on SIGINT or SIGTERM.
