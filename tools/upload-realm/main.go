@@ -7,14 +7,11 @@ import (
 	"flag"
 	"fmt"
 	"os"
-	"os/signal"
 	"path/filepath"
 	"strings"
 	"sync/atomic"
-	"syscall"
 	"time"
 
-	"github.com/sandertv/gophertunnel/minecraft"
 	"github.com/sandertv/gophertunnel/minecraft/auth"
 	"github.com/sandertv/gophertunnel/minecraft/protocol/packet"
 	"github.com/sandertv/gophertunnel/minecraft/realms"
@@ -58,69 +55,21 @@ func main() {
 }
 
 func runPing(duration int) error {
-	inviteCode, err := getRealmInvite()
+	rc, err := dialRealm()
 	if err != nil {
 		return err
 	}
-
-	tokenSource, err := getTokenSource()
-	if err != nil {
-		return fmt.Errorf("auth error: %w", err)
-	}
-
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-
-	// Set up OS signal listener for clean shutdown
-	sigCh := make(chan os.Signal, 1)
-	signal.Notify(sigCh, syscall.SIGINT, syscall.SIGTERM)
-	go func() {
-		<-sigCh
-		fmt.Println("\nReceived interrupt, shutting down...")
-		cancel()
-	}()
+	defer rc.Conn.Close()
+	defer rc.Cancel()
+	setupSignalHandler(rc.Cancel)
 
 	// If duration > 0, set a timer to cancel
 	if duration > 0 {
 		time.AfterFunc(time.Duration(duration)*time.Second, func() {
 			fmt.Printf("\nDuration (%ds) expired, shutting down...\n", duration)
-			cancel()
+			rc.Cancel()
 		})
 	}
-
-	realmsClient := realms.NewClient(tokenSource, nil)
-	fmt.Println("Looking up Realm...")
-	realm, err := realmsClient.Realm(ctx, inviteCode)
-	if err != nil {
-		return fmt.Errorf("realm lookup error: %w", err)
-	}
-
-	address, err := realm.Address(ctx)
-	if err != nil {
-		return fmt.Errorf("realm address error: %w", err)
-	}
-
-	fmt.Printf("Connecting to %s (%s)...\n", realm.Name, address)
-
-	dialer := minecraft.Dialer{
-		TokenSource: tokenSource,
-	}
-
-	conn, err := dialer.Dial("raknet", address)
-	if err != nil {
-		return fmt.Errorf("connection error: %w", err)
-	}
-	defer conn.Close()
-
-	if err := conn.DoSpawn(); err != nil {
-		return fmt.Errorf("spawn error: %w", err)
-	}
-
-	// Log GameData summary
-	gd := conn.GameData()
-	fmt.Printf("Spawned! World: %s, Gamemode: %d, Position: (%.1f, %.1f, %.1f)\n",
-		gd.WorldName, gd.PlayerGameMode,
-		gd.PlayerPosition.X(), gd.PlayerPosition.Y(), gd.PlayerPosition.Z())
 
 	if duration > 0 {
 		fmt.Printf("Ping mode active for %ds (Ctrl+C to stop early)...\n", duration)
@@ -136,7 +85,7 @@ func runPing(duration int) error {
 	go func() {
 		time.Sleep(2 * time.Second)
 		for _, size := range testSizes {
-			if ctx.Err() != nil {
+			if rc.Ctx.Err() != nil {
 				return
 			}
 			msg := fmt.Sprintf("[%d] ", size)
@@ -144,7 +93,7 @@ func runPing(duration int) error {
 				msg += "A"
 			}
 			msg = msg[:size]
-			err := conn.WritePacket(&packet.Text{
+			err := rc.Conn.WritePacket(&packet.Text{
 				TextType: packet.TextTypeChat,
 				Message:  msg,
 			})
@@ -164,10 +113,10 @@ func runPing(duration int) error {
 	lastTimePrint := time.Now()
 
 	for {
-		pk, err := conn.ReadPacket()
+		pk, err := rc.Conn.ReadPacket()
 		if err != nil {
 			// Check if context was cancelled (clean shutdown)
-			if ctx.Err() != nil {
+			if rc.Ctx.Err() != nil {
 				break
 			}
 			fmt.Printf("[read] error: %v\n", err)
@@ -189,7 +138,7 @@ func runPing(duration int) error {
 				p.Severity, p.Type, p.PacketID, p.ViolationContext)
 		case *packet.Disconnect:
 			fmt.Printf("[disconnect] %s\n", p.Message)
-			cancel()
+			rc.Cancel()
 		default:
 			name := fmt.Sprintf("%T", pk)
 			packetCounts[name]++
@@ -206,7 +155,7 @@ func runPing(duration int) error {
 			lastSummary = time.Now()
 		}
 
-		if ctx.Err() != nil {
+		if rc.Ctx.Err() != nil {
 			break
 		}
 	}
@@ -252,13 +201,7 @@ func runPackInstaller(packPath string, noBackup bool) error {
 }
 
 func runChunkUploader(chunksFile string) error {
-	// Get realm invite code
-	inviteCode, err := getRealmInvite()
-	if err != nil {
-		return err
-	}
-
-	// Read chunks
+	// Read chunks first (fail fast before connecting)
 	chunks, err := readChunks(chunksFile)
 	if err != nil {
 		return err
@@ -266,55 +209,28 @@ func runChunkUploader(chunksFile string) error {
 
 	fmt.Printf("Uploading %d chunks to Realm...\n", len(chunks))
 
-	// Authenticate (with token caching)
-	tokenSource, err := getTokenSource()
+	rc, err := dialRealm()
 	if err != nil {
-		return fmt.Errorf("auth error: %w", err)
+		return err
 	}
+	defer rc.Conn.Close()
+	defer rc.Cancel()
+	setupSignalHandler(rc.Cancel)
 
-	// Get Realm address
-	ctx := context.Background()
-	realmsClient := realms.NewClient(tokenSource, nil)
-
-	fmt.Println("Looking up Realm...")
-	realm, err := realmsClient.Realm(ctx, inviteCode)
-	if err != nil {
-		return fmt.Errorf("realm lookup error: %w", err)
-	}
-
-	address, err := realm.Address(ctx)
-	if err != nil {
-		return fmt.Errorf("realm address error: %w", err)
-	}
-
-	fmt.Printf("Connecting to %s (%s)...\n", realm.Name, address)
-
-	// Connect
-	dialer := minecraft.Dialer{
-		TokenSource: tokenSource,
-	}
-
-	conn, err := dialer.Dial("raknet", address)
-	if err != nil {
-		return fmt.Errorf("connection error: %w", err)
-	}
-	defer conn.Close()
-
-	// Spawn
-	if err := conn.DoSpawn(); err != nil {
-		return fmt.Errorf("spawn error: %w", err)
-	}
-
-	fmt.Println("Connected! Sending chunks as chat messages...")
+	fmt.Println("Sending chunks as chat messages...")
 
 	// Send chunks as chat messages
 	for i, chunk := range chunks {
-		err := conn.WritePacket(&packet.Text{
+		if rc.Ctx.Err() != nil {
+			return fmt.Errorf("interrupted after %d/%d chunks", i, len(chunks))
+		}
+
+		err := rc.Conn.WritePacket(&packet.Text{
 			TextType: packet.TextTypeChat,
 			Message:  fmt.Sprintf("!chunk %s", chunk),
 		})
 		if err != nil {
-			return fmt.Errorf("send error: %w", err)
+			return fmt.Errorf("send error at chunk %d: %w", i+1, err)
 		}
 
 		if (i+1)%50 == 0 {
@@ -324,9 +240,62 @@ func runChunkUploader(chunksFile string) error {
 		time.Sleep(50 * time.Millisecond)
 	}
 
-	fmt.Printf("Done! Sent %d chunks.\n", len(chunks))
-	time.Sleep(time.Second)
-	return nil
+	fmt.Printf("Done! Sent %d chunks. Waiting for script responses...\n", len(chunks))
+
+	// Read loop with 30s inactivity timeout
+	timeout := time.NewTimer(30 * time.Second)
+	defer timeout.Stop()
+
+	for {
+		// Read packets in a goroutine so we can also select on timeout/context
+		type readResult struct {
+			pk  packet.Packet
+			err error
+		}
+		ch := make(chan readResult, 1)
+		go func() {
+			pk, err := rc.Conn.ReadPacket()
+			ch <- readResult{pk, err}
+		}()
+
+		select {
+		case <-rc.Ctx.Done():
+			fmt.Println("Interrupted.")
+			return nil
+		case <-timeout.C:
+			fmt.Println("No activity for 30s, disconnecting.")
+			return nil
+		case result := <-ch:
+			if result.err != nil {
+				if rc.Ctx.Err() != nil {
+					return nil
+				}
+				fmt.Printf("[read] error: %v\n", result.err)
+				return nil
+			}
+
+			switch p := result.pk.(type) {
+			case *packet.Text:
+				fmt.Printf("[chat] %s: %s\n", p.SourceName, p.Message)
+				// Reset inactivity timeout on chat messages
+				if !timeout.Stop() {
+					select {
+					case <-timeout.C:
+					default:
+					}
+				}
+				timeout.Reset(30 * time.Second)
+				// Early exit on build completion
+				if strings.Contains(p.Message, "Build complete") {
+					fmt.Println("Build complete! Disconnecting.")
+					return nil
+				}
+			case *packet.Disconnect:
+				fmt.Printf("[disconnect] %s\n", p.Message)
+				return nil
+			}
+		}
+	}
 }
 
 func getTokenSource() (oauth2.TokenSource, error) {
