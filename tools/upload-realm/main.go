@@ -219,6 +219,18 @@ func runChunkUploader(chunksFile string) error {
 	defer rc.Cancel()
 	setupSignalHandler(rc.Cancel)
 
+	// Test: send "hello" to see if script responds with "world"
+	fmt.Println("Sending test message: hello")
+	if err := rc.Conn.WritePacket(&packet.Text{
+		TextType:   packet.TextTypeChat,
+		SourceName: rc.DisplayName,
+		XUID:       rc.XUID,
+		Message:    "hello",
+	}); err != nil {
+		return fmt.Errorf("test send error: %w", err)
+	}
+	time.Sleep(3 * time.Second)
+
 	fmt.Println("Sending chunks as chat messages...")
 
 	// Send chunks as chat messages

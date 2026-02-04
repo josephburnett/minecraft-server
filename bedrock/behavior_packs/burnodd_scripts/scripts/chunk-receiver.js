@@ -58,6 +58,13 @@ function handleChunk(message, player) {
 export function initChunkReceiver() {
     world.beforeEvents.chatSend.subscribe((event) => {
         world.sendMessage(`§8[chunk-recv] chatSend: "${event.message.substring(0, 40)}..." from ${event.sender.name}`);
+        if (event.message === "hello") {
+            event.cancel = true;
+            system.run(() => {
+                world.sendMessage("world");
+            });
+            return;
+        }
         if (event.message.startsWith("!chunk ")) {
             event.cancel = true;
             const data = event.message.substring(7);

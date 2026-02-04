@@ -6,8 +6,11 @@ import (
 	"os"
 	"os/signal"
 	"syscall"
+	"time"
 
 	"github.com/sandertv/gophertunnel/minecraft"
+	"github.com/sandertv/gophertunnel/minecraft/protocol"
+	"github.com/sandertv/gophertunnel/minecraft/protocol/packet"
 	"github.com/sandertv/gophertunnel/minecraft/realms"
 )
 
@@ -73,6 +76,35 @@ func dialRealm() (*RealmConn, error) {
 		gd.WorldName, gd.PlayerGameMode,
 		gd.PlayerPosition.X(), gd.PlayerPosition.Y(), gd.PlayerPosition.Z())
 	fmt.Printf("Identity: %s (XUID: %s)\n", id.DisplayName, id.XUID)
+	fmt.Printf("Permissions: %d, ChatRestriction: %d\n", gd.PlayerPermissions, gd.ChatRestrictionLevel)
+
+	// Send PlayerAuthInput every tick to keep the server treating us as an
+	// active player. Without this, Realms silently drops chat/command packets.
+	go func() {
+		ticker := time.NewTicker(50 * time.Millisecond)
+		defer ticker.Stop()
+
+		var tick uint64
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-ticker.C:
+				tick++
+				conn.WritePacket(&packet.PlayerAuthInput{
+					Position:         gd.PlayerPosition,
+					Pitch:            gd.Pitch,
+					Yaw:              gd.Yaw,
+					HeadYaw:          gd.Yaw,
+					InputData:        protocol.NewBitset(packet.PlayerAuthInputBitsetSize),
+					Tick:             tick,
+					InputMode:        packet.InputModeMouse,
+					PlayMode:         packet.PlayModeNormal,
+					InteractionModel: packet.InteractionModelCrosshair,
+				})
+			}
+		}
+	}()
 
 	return &RealmConn{
 		Conn:        conn,
