@@ -1,4 +1,4 @@
-import { world } from "@minecraft/server";
+import { world, system } from "@minecraft/server";
 import { ABILITIES } from "./abilities.js";
 import { hasPermission } from "./permissions.js";
 import { initChunkReceiver } from "./chunk-receiver.js";
@@ -52,6 +52,29 @@ initMazeHandler();
 initMarkerHandler();
 initSphereHandler();
 initCubeHandler();
+
+// =============================================================================
+// CONNECTION DIAGNOSTICS
+// =============================================================================
+world.afterEvents.playerJoin.subscribe((event) => {
+    world.sendMessage(`§8[diag] playerJoin: ${event.playerName}`);
+});
+
+world.afterEvents.playerSpawn.subscribe((event) => {
+    world.sendMessage(`§8[diag] playerSpawn: ${event.player.name} initialSpawn=${event.initialSpawn}`);
+});
+
+world.afterEvents.playerLeave.subscribe((event) => {
+    world.sendMessage(`§8[diag] playerLeave: ${event.playerName}`);
+});
+
+world.beforeEvents.chatSend.subscribe((event) => {
+    world.sendMessage(`§8[diag] chatSend: "${event.message}" from ${event.sender.name}`);
+});
+
+system.afterEvents.scriptEventReceive.subscribe((event) => {
+    world.sendMessage(`§8[diag] scriptEvent: id=${event.id} msg="${event.message}" src=${event.sourceType}`);
+});
 
 // =============================================================================
 // STARTUP
