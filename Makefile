@@ -1,4 +1,4 @@
-.PHONY: start stop restart logs reload status upload upload-local play install-pack pack ping
+.PHONY: start stop restart logs reload status upload-local play pack proxy
 .PHONY: maze sphere cube pyramid test
 
 # Docker commands
@@ -45,20 +45,12 @@ pyramid:
 test:
 	@node tools/generators/test.js $(or $(PATTERN),frame) $(or $(SIZE),10) > structure.chunks
 
-# Upload chunks to Realm via gophertunnel (set REALM_INVITE or create .realm-invite)
-upload: tools/upload-realm/realmctl
-	tools/upload-realm/realmctl -chunks structure.chunks
+# Proxy: MCP server + Minecraft Bedrock proxy to Realm
+proxy: tools/proxy/proxy
+	tools/proxy/proxy
 
-# Install behavior pack to Realm (one-time setup)
-install-pack: tools/upload-realm/realmctl
-	tools/upload-realm/realmctl -install-pack
-
-# Ping mode: connect to Realm and send periodic time queries
-ping: tools/upload-realm/realmctl
-	tools/upload-realm/realmctl -ping
-
-tools/upload-realm/realmctl: tools/upload-realm/*.go
-	cd tools/upload-realm && go build -o realmctl .
+tools/proxy/proxy: tools/proxy/*.go
+	cd tools/proxy && go build -o proxy .
 
 # Upload chunks to local Docker server
 upload-local:

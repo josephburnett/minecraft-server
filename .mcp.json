@@ -1,0 +1,9 @@
+{
+  "mcpServers": {
+    "minecraft": {
+      "command": "tools/proxy/proxy",
+      "args": [],
+      "env": {}
+    }
+  }
+}
