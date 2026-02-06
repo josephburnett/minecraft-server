@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { ABILITIES } from '../bedrock/behavior_packs/burnodd_scripts/scripts/abilities.js';
+import { ABILITIES } from '../behavior_pack/scripts/abilities.js';
 import { Dimension } from './mocks/minecraft-server.js';
 
 // Helper: set up a dimension with blocks in a radius around a center

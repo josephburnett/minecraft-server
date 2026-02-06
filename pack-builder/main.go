@@ -44,7 +44,7 @@ type Dependency struct {
 }
 
 func main() {
-	packDir := flag.String("pack", "bedrock/behavior_packs/burnodd_scripts", "Path to behavior pack directory")
+	packDir := flag.String("pack", "behavior_pack", "Path to behavior pack directory")
 	outputDir := flag.String("output-dir", "output", "Output directory for .mcpack file")
 	noBump := flag.Bool("no-bump", false, "Skip version bump")
 	flag.Parse()

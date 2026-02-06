@@ -1,7 +1,7 @@
 {
   "mcpServers": {
     "minecraft": {
-      "command": "tools/proxy/proxy",
+      "command": "bridge/bridge",
       "args": [],
       "env": {}
     }

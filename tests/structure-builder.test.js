@@ -3,7 +3,7 @@ import {
     base64Decode,
     decodeBitfield,
     decodePalette
-} from '../bedrock/behavior_packs/burnodd_scripts/scripts/structure-builder.js';
+} from '../behavior_pack/scripts/structure-builder.js';
 
 describe('base64Decode', () => {
     it('decodes simple base64 string', () => {

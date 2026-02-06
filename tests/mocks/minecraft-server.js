@@ -29,6 +29,15 @@ export const world = {
     },
     worldLoad: {
       subscribe: (callback) => { _subscribers.afterWorldLoad.push(callback); }
+    },
+    playerJoin: {
+      subscribe: () => {}
+    },
+    playerSpawn: {
+      subscribe: () => {}
+    },
+    playerLeave: {
+      subscribe: () => {}
     }
   }
 };
@@ -44,6 +53,11 @@ export const system = {
   },
   run: (callback) => {
     callback();
+  },
+  afterEvents: {
+    scriptEventReceive: {
+      subscribe: () => {}
+    }
   }
 };
 

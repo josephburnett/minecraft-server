@@ -4,11 +4,11 @@ import {
     generateMazeGrid,
     rotateBlocks,
     parseMazeOptions
-} from '../bedrock/behavior_packs/burnodd_scripts/scripts/maze.js';
+} from '../behavior_pack/scripts/maze.js';
 import {
     createGrid,
     gridToBlocks
-} from '../bedrock/behavior_packs/burnodd_scripts/scripts/shapes.js';
+} from '../behavior_pack/scripts/shapes.js';
 
 describe('createGrid', () => {
     it('creates a 3D grid with correct dimensions', () => {

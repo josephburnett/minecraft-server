@@ -9,10 +9,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/google/uuid"
 	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/mark3labs/mcp-go/server"
-	"github.com/sandertv/gophertunnel/minecraft/protocol"
 	"github.com/sandertv/gophertunnel/minecraft/protocol/packet"
 )
 
@@ -68,19 +66,20 @@ func registerActionTools(s *server.MCPServer, state *GameState) {
 			if err != nil {
 				return mcp.NewToolResultError(err.Error()), nil
 			}
-			// Ensure no leading slash
+			// Ensure leading slash
 			cmd = strings.TrimPrefix(cmd, "/")
 
+			// Send as chat message — CommandRequest packets can cause disconnects on Realms
+			name, xuid := state.Identity()
 			conn := state.ServerConn()
 			if conn == nil {
 				return mcp.NewToolResultError("server connection not available"), nil
 			}
-			if err := conn.WritePacket(&packet.CommandRequest{
-				CommandLine: "/" + cmd,
-				CommandOrigin: protocol.CommandOrigin{
-					Origin: protocol.CommandOriginPlayer,
-					UUID:   uuid.New(),
-				},
+			if err := conn.WritePacket(&packet.Text{
+				TextType:   packet.TextTypeChat,
+				SourceName: name,
+				XUID:       xuid,
+				Message:    "/" + cmd,
 			}); err != nil {
 				return mcp.NewToolResultError(fmt.Sprintf("command error: %v", err)), nil
 			}
@@ -113,17 +112,17 @@ func registerActionTools(s *server.MCPServer, state *GameState) {
 				return mcp.NewToolResultError(err.Error()), nil
 			}
 
-			cmd := fmt.Sprintf("/tp @s %.2f %.2f %.2f", x, y, z)
+			msg := fmt.Sprintf("/tp @s %.2f %.2f %.2f", x, y, z)
+			name, xuid := state.Identity()
 			conn := state.ServerConn()
 			if conn == nil {
 				return mcp.NewToolResultError("server connection not available"), nil
 			}
-			if err := conn.WritePacket(&packet.CommandRequest{
-				CommandLine: cmd,
-				CommandOrigin: protocol.CommandOrigin{
-					Origin: protocol.CommandOriginPlayer,
-					UUID:   uuid.New(),
-				},
+			if err := conn.WritePacket(&packet.Text{
+				TextType:   packet.TextTypeChat,
+				SourceName: name,
+				XUID:       xuid,
+				Message:    msg,
 			}); err != nil {
 				return mcp.NewToolResultError(fmt.Sprintf("teleport error: %v", err)), nil
 			}

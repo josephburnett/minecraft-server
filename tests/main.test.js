@@ -7,7 +7,7 @@ let breakHandler;
 beforeAll(async () => {
     // Clear any prior subscribers
     _subscribers.beforePlayerBreakBlock.length = 0;
-    await import('../bedrock/behavior_packs/burnodd_scripts/scripts/main.js');
+    await import('../behavior_pack/scripts/main.js');
     breakHandler = _subscribers.beforePlayerBreakBlock[0];
 });
 

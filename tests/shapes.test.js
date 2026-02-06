@@ -4,7 +4,7 @@ import {
     gridToBlocks,
     generateSphereGrid,
     generateCubeGrid
-} from '../bedrock/behavior_packs/burnodd_scripts/scripts/shapes.js';
+} from '../behavior_pack/scripts/shapes.js';
 
 describe('createGrid', () => {
     it('creates grid with correct dimensions', () => {

@@ -9,23 +9,9 @@ node_modules/
 # Test coverage
 coverage/
 
-# World data (stored in Docker volume, back up separately)
-bedrock/worlds/
-
-# Vanilla behavior packs (auto-generated backups from server updates)
-bedrock/behavior_packs/*
-# Keep custom packs
-!bedrock/behavior_packs/burnodd_scripts/
-
-# Generated structure chunks
-structure.chunks
-
 # Compiled binaries
-tools/proxy/proxy
-tools/pack-builder/pack-builder
-
-# Realm world backups
-backups/
+bridge/bridge
+pack-builder/pack-builder
 
 # Output folder contents (but keep .mcpack for download)
 output/*

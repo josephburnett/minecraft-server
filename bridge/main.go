@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"flag"
+	"fmt"
 	"io"
 	"log/slog"
 	"os"
@@ -15,6 +16,7 @@ import (
 func main() {
 	listenAddr := flag.String("listen", ":19132", "Address for the Minecraft proxy listener")
 	invite := flag.String("invite", "", "Realm invite code (overrides REALM_INVITE env / .realm-invite file)")
+	authOnly := flag.Bool("auth", false, "Authenticate with Xbox Live and exit")
 	flag.Parse()
 
 	// Log to file (stdout is MCP stdio, stderr may not be visible)
@@ -34,6 +36,11 @@ func main() {
 		os.Exit(1)
 	}
 
+	if *authOnly {
+		fmt.Fprintln(os.Stderr, "Authentication successful")
+		os.Exit(0)
+	}
+
 	// Resolve realm invite code
 	inviteCode := *invite
 	if inviteCode == "" {
@@ -50,7 +57,7 @@ func main() {
 
 	// Create MCP server
 	mcpServer := server.NewMCPServer(
-		"minecraft-proxy",
+		"minecraft",
 		"1.0.0",
 		server.WithToolCapabilities(false),
 	)

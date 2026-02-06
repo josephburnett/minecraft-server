@@ -83,7 +83,7 @@ func findRelativeToExe(name string) string {
 	if err != nil {
 		return ""
 	}
-	dir := filepath.Dir(filepath.Dir(exe))
+	dir := filepath.Dir(exe)
 	return filepath.Join(dir, name)
 }
 
