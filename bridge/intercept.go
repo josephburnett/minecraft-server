@@ -16,6 +16,7 @@ func interceptClientPacket(pk packet.Packet, state *GameState) {
 			p.Position.X(), p.Position.Y(), p.Position.Z(),
 			p.Pitch, p.Yaw,
 		)
+		logPlayerAuthInputBuilding(p, state)
 	case *packet.Text:
 		if p.TextType == packet.TextTypeChat {
 			state.AppendChat(ChatMessage{
@@ -25,6 +26,12 @@ func interceptClientPacket(pk packet.Packet, state *GameState) {
 				Type:    "outgoing",
 			})
 		}
+	case *packet.InventoryTransaction:
+		logInventoryTransaction(p, state)
+	case *packet.PlayerAction:
+		logPlayerAction(p, state)
+	case *packet.MobEquipment:
+		logMobEquipment(p, state)
 	}
 }
 
@@ -95,5 +102,16 @@ func interceptServerPacket(pk packet.Packet, state *GameState) {
 
 	case *packet.MoveActorDelta:
 		state.UpdateEntityPosition(p.EntityRuntimeID, p.Position)
+
+	case *packet.UpdateBlock:
+		logUpdateBlock(p, state)
+	case *packet.LevelEvent:
+		logLevelEvent(p, state)
+	case *packet.ItemStackResponse:
+		logItemStackResponse(p, state)
+	case *packet.ContainerOpen:
+		logContainerOpen(p, state)
+	case *packet.ContainerClose:
+		logContainerClose(p, state)
 	}
 }

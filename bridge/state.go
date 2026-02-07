@@ -92,17 +92,24 @@ type GameState struct {
 
 	// Item registry from StartGame (for resolving network IDs to names)
 	itemRegistry map[int32]string // network ID -> item name
+
+	// Verbose packet logging toggle
+	verbosePacketLog bool
+
+	// Block registry: block runtime ID -> name, learned from observation
+	blockRegistry map[uint32]string
 }
 
 // NewGameState creates a new GameState with initial status.
 func NewGameState() *GameState {
 	return &GameState{
-		status:       StatusStarting,
-		inventory:    make(map[byte][]protocol.ItemInstance),
-		players:      make(map[string]PlayerInfo),
-		attributes:   make(map[string]float32),
-		entities:     make(map[uint64]EntityInfo),
-		itemRegistry: make(map[int32]string),
+		status:        StatusStarting,
+		inventory:     make(map[byte][]protocol.ItemInstance),
+		players:       make(map[string]PlayerInfo),
+		attributes:    make(map[string]float32),
+		entities:      make(map[uint64]EntityInfo),
+		itemRegistry:  make(map[int32]string),
+		blockRegistry: make(map[uint32]string),
 	}
 }
 
@@ -372,4 +379,42 @@ func (gs *GameState) UpdateEntityPosition(runtimeID uint64, pos mgl32.Vec3) {
 		e.Position = pos
 		gs.entities[runtimeID] = e
 	}
+}
+
+// SetVerbosePacketLog enables or disables verbose packet logging.
+func (gs *GameState) SetVerbosePacketLog(enabled bool) {
+	gs.mu.Lock()
+	defer gs.mu.Unlock()
+	gs.verbosePacketLog = enabled
+}
+
+// VerbosePacketLog returns whether verbose packet logging is enabled.
+func (gs *GameState) VerbosePacketLog() bool {
+	gs.mu.RLock()
+	defer gs.mu.RUnlock()
+	return gs.verbosePacketLog
+}
+
+// ResolveItemName converts a network ID to an item name using the registry (thread-safe).
+func (gs *GameState) ResolveItemName(networkID int32) string {
+	gs.mu.RLock()
+	defer gs.mu.RUnlock()
+	return gs.resolveItemName(networkID)
+}
+
+// LearnBlock stores an observed block runtime ID to name mapping.
+func (gs *GameState) LearnBlock(runtimeID uint32, name string) {
+	gs.mu.Lock()
+	defer gs.mu.Unlock()
+	gs.blockRegistry[runtimeID] = name
+}
+
+// ResolveBlockName returns the learned name for a block runtime ID, or "rid:NNNNN".
+func (gs *GameState) ResolveBlockName(runtimeID uint32) string {
+	gs.mu.RLock()
+	defer gs.mu.RUnlock()
+	if name, ok := gs.blockRegistry[runtimeID]; ok {
+		return name
+	}
+	return fmt.Sprintf("rid:%d", runtimeID)
 }

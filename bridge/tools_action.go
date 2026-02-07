@@ -130,6 +130,30 @@ func registerActionTools(s *server.MCPServer, state *GameState) {
 		},
 	)
 
+	// toggle_packet_logging
+	s.AddTool(
+		mcp.NewTool("toggle_packet_logging",
+			mcp.WithDescription("Enable or disable verbose logging of building-related packets (block placement, breaking, inventory, etc.)"),
+			mcp.WithBoolean("enabled",
+				mcp.Required(),
+				mcp.Description("Whether to enable verbose packet logging"),
+			),
+		),
+		func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+			enabled, err := req.RequireBool("enabled")
+			if err != nil {
+				return mcp.NewToolResultError(err.Error()), nil
+			}
+			state.SetVerbosePacketLog(enabled)
+			status := "disabled"
+			if enabled {
+				status = "enabled"
+			}
+			slog.Info("packet logging toggled", "enabled", enabled)
+			return mcp.NewToolResultText(fmt.Sprintf("verbose packet logging %s", status)), nil
+		},
+	)
+
 	// upload_structure
 	s.AddTool(
 		mcp.NewTool("upload_structure",

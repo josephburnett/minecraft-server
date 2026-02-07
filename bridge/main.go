@@ -17,6 +17,7 @@ func main() {
 	listenAddr := flag.String("listen", ":19132", "Address for the Minecraft proxy listener")
 	invite := flag.String("invite", "", "Realm invite code (overrides REALM_INVITE env / .realm-invite file)")
 	authOnly := flag.Bool("auth", false, "Authenticate with Xbox Live and exit")
+	verbosePackets := flag.Bool("verbose-packets", false, "Enable verbose building packet logging")
 	flag.Parse()
 
 	// Log to file (stdout is MCP stdio, stderr may not be visible)
@@ -54,6 +55,7 @@ func main() {
 
 	// Create game state
 	state := NewGameState()
+	state.SetVerbosePacketLog(*verbosePackets)
 
 	// Create MCP server
 	mcpServer := server.NewMCPServer(
