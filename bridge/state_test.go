@@ -414,6 +414,40 @@ func TestBlockRegistry(t *testing.T) {
 	}
 }
 
+func TestResolveItemNetworkID(t *testing.T) {
+	gs := NewGameState()
+	gs.mu.Lock()
+	gs.itemRegistry[5] = "minecraft:stone"
+	gs.itemRegistry[10] = "minecraft:dirt"
+	gs.mu.Unlock()
+
+	// Found
+	id, ok := gs.ResolveItemNetworkID("minecraft:stone")
+	if !ok {
+		t.Fatal("expected to find minecraft:stone")
+	}
+	if id != 5 {
+		t.Errorf("expected network ID 5, got %d", id)
+	}
+
+	id, ok = gs.ResolveItemNetworkID("minecraft:dirt")
+	if !ok {
+		t.Fatal("expected to find minecraft:dirt")
+	}
+	if id != 10 {
+		t.Errorf("expected network ID 10, got %d", id)
+	}
+
+	// Not found
+	id, ok = gs.ResolveItemNetworkID("minecraft:diamond")
+	if ok {
+		t.Error("expected not to find minecraft:diamond")
+	}
+	if id != 0 {
+		t.Errorf("expected network ID 0 for not-found, got %d", id)
+	}
+}
+
 func TestConcurrency(t *testing.T) {
 	gs := NewGameState()
 	var wg sync.WaitGroup

@@ -3,14 +3,18 @@ package main
 import (
 	"bufio"
 	"context"
+	"encoding/json"
 	"fmt"
 	"log/slog"
 	"os"
 	"strings"
 	"time"
 
+	"github.com/go-gl/mathgl/mgl32"
 	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/mark3labs/mcp-go/server"
+	"github.com/sandertv/gophertunnel/minecraft"
+	"github.com/sandertv/gophertunnel/minecraft/protocol"
 	"github.com/sandertv/gophertunnel/minecraft/protocol/packet"
 )
 
@@ -154,6 +158,70 @@ func registerActionTools(s *server.MCPServer, state *GameState) {
 		},
 	)
 
+	// place_blocks
+	s.AddTool(
+		mcp.NewTool("place_blocks",
+			mcp.WithDescription("Place blocks in the world by sending the full client placement packet sequence. Requires creative mode or the blocks in inventory. Each entry specifies coordinates and a block name."),
+			mcp.WithString("blocks",
+				mcp.Required(),
+				mcp.Description(`JSON array of block placements, e.g. [{"x":0,"y":64,"z":0,"block_name":"minecraft:stone"}]`),
+			),
+			mcp.WithNumber("delay_ms",
+				mcp.Description("Delay in milliseconds between placements (default 100)"),
+			),
+		),
+		func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+			if err := requireConnected(state); err != nil {
+				return mcp.NewToolResultError(err.Error()), nil
+			}
+			blocksJSON, err := req.RequireString("blocks")
+			if err != nil {
+				return mcp.NewToolResultError(err.Error()), nil
+			}
+			delayMs := req.GetInt("delay_ms", 100)
+			delay := time.Duration(delayMs) * time.Millisecond
+
+			var blocks []struct {
+				X         int    `json:"x"`
+				Y         int    `json:"y"`
+				Z         int    `json:"z"`
+				BlockName string `json:"block_name"`
+			}
+			if err := json.Unmarshal([]byte(blocksJSON), &blocks); err != nil {
+				return mcp.NewToolResultError(fmt.Sprintf("invalid blocks JSON: %v", err)), nil
+			}
+			if len(blocks) == 0 {
+				return mcp.NewToolResultError("blocks array is empty"), nil
+			}
+
+			conn := state.ServerConn()
+			if conn == nil {
+				return mcp.NewToolResultError("server connection not available"), nil
+			}
+
+			placed := 0
+			for i, b := range blocks {
+				select {
+				case <-ctx.Done():
+					return mcp.NewToolResultText(fmt.Sprintf("interrupted after %d/%d blocks", placed, len(blocks))), nil
+				default:
+				}
+
+				if err := placeBlock(conn, state, int32(b.X), int32(b.Y), int32(b.Z), b.BlockName); err != nil {
+					slog.Warn("place_blocks: placement failed", "index", i, "block", b.BlockName, "error", err)
+					return mcp.NewToolResultError(fmt.Sprintf("failed at block %d (%s at %d,%d,%d): %v", i, b.BlockName, b.X, b.Y, b.Z, err)), nil
+				}
+				placed++
+
+				if delay > 0 && i < len(blocks)-1 {
+					time.Sleep(delay)
+				}
+			}
+
+			return mcp.NewToolResultText(fmt.Sprintf("placed %d blocks", placed)), nil
+		},
+	)
+
 	// upload_structure
 	s.AddTool(
 		mcp.NewTool("upload_structure",
@@ -238,4 +306,92 @@ func readChunksFile(path string) ([]string, error) {
 		}
 	}
 	return chunks, scanner.Err()
+}
+
+// placeBlock sends the 4-packet block placement sequence to the server connection,
+// mimicking what the real client sends when a player places a block.
+func placeBlock(conn *minecraft.Conn, state *GameState, x, y, z int32, blockName string) error {
+	networkID, ok := state.ResolveItemNetworkID(blockName)
+	if !ok {
+		return fmt.Errorf("unknown block name %q (not in item registry)", blockName)
+	}
+
+	entityID := state.EntityID()
+	posX, posY, posZ, _, _, _ := state.Position()
+
+	targetPos := protocol.BlockPos{x, y - 1, z} // block below — we "click on top"
+	newPos := protocol.BlockPos{x, y, z}         // where the block will appear
+
+	heldItem := protocol.ItemInstance{
+		StackNetworkID: 0,
+		Stack: protocol.ItemStack{
+			ItemType: protocol.ItemType{
+				NetworkID:     networkID,
+				MetadataValue: 0,
+			},
+			BlockRuntimeID: 0,
+			Count:          1,
+			HasNetworkID:   false,
+		},
+	}
+
+	// 1. PlayerAction(StartItemUseOn)
+	if err := conn.WritePacket(&packet.PlayerAction{
+		EntityRuntimeID: entityID,
+		ActionType:      protocol.PlayerActionStartItemUseOn,
+		BlockPosition:   targetPos,
+		ResultPosition:  newPos,
+		BlockFace:       1, // Up
+	}); err != nil {
+		return fmt.Errorf("StartItemUseOn: %w", err)
+	}
+
+	// 2. InventoryTransaction(ClickBlock)
+	if err := conn.WritePacket(&packet.InventoryTransaction{
+		TransactionData: &protocol.UseItemTransactionData{
+			ActionType:     protocol.UseItemActionClickBlock,
+			TriggerType:    protocol.TriggerTypePlayerInput,
+			BlockPosition:  targetPos,
+			BlockFace:      1, // Up
+			HotBarSlot:     0,
+			HeldItem:       heldItem,
+			Position:       mgl32.Vec3{posX, posY, posZ},
+			ClickedPosition: mgl32.Vec3{0.5, 0.5, 0.5},
+			BlockRuntimeID: 0,
+			ClientPrediction: protocol.ClientPredictionSuccess,
+		},
+	}); err != nil {
+		return fmt.Errorf("ClickBlock: %w", err)
+	}
+
+	// 3. InventoryTransaction(ClickAir)
+	if err := conn.WritePacket(&packet.InventoryTransaction{
+		TransactionData: &protocol.UseItemTransactionData{
+			ActionType:     protocol.UseItemActionClickAir,
+			TriggerType:    protocol.TriggerTypePlayerInput,
+			BlockPosition:  protocol.BlockPos{0, 0, 0},
+			BlockFace:      -1,
+			HotBarSlot:     0,
+			HeldItem:       heldItem,
+			Position:       mgl32.Vec3{posX, posY, posZ},
+			ClickedPosition: mgl32.Vec3{0, 0, 0},
+			BlockRuntimeID: 0,
+			ClientPrediction: protocol.ClientPredictionSuccess,
+		},
+	}); err != nil {
+		return fmt.Errorf("ClickAir: %w", err)
+	}
+
+	// 4. PlayerAction(StopItemUseOn)
+	if err := conn.WritePacket(&packet.PlayerAction{
+		EntityRuntimeID: entityID,
+		ActionType:      protocol.PlayerActionStopItemUseOn,
+		BlockPosition:   newPos,
+		ResultPosition:  protocol.BlockPos{0, 0, 0},
+		BlockFace:       0, // Down
+	}); err != nil {
+		return fmt.Errorf("StopItemUseOn: %w", err)
+	}
+
+	return nil
 }

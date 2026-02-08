@@ -402,6 +402,19 @@ func (gs *GameState) ResolveItemName(networkID int32) string {
 	return gs.resolveItemName(networkID)
 }
 
+// ResolveItemNetworkID returns the network ID for a given item name by reverse-lookup
+// in the item registry. Returns (0, false) if the name is not found.
+func (gs *GameState) ResolveItemNetworkID(name string) (int32, bool) {
+	gs.mu.RLock()
+	defer gs.mu.RUnlock()
+	for id, n := range gs.itemRegistry {
+		if n == name {
+			return id, true
+		}
+	}
+	return 0, false
+}
+
 // LearnBlock stores an observed block runtime ID to name mapping.
 func (gs *GameState) LearnBlock(runtimeID uint32, name string) {
 	gs.mu.Lock()
